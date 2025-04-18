@@ -41,5 +41,16 @@ set(EXECUTABLES
     # SOURCES <source1> <source2> ...
 )
 
+add_executable(echoAll
+        src/osmpExecutables/echoAll.c
+        src/osmpLibrary/osmpLib.c
+        src/osmpLibrary/osmpLib.h
+        src/osmpLibrary/OSMP.h
+        src/util/custom/custom.c
+        src/util/wrapper/wrapper.c
+        src/util/custom/custom.h
+        src/util/wrapper/wrapper.h
+)
+
 validate_executables()
 create_executables()
