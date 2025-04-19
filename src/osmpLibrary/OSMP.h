@@ -9,6 +9,15 @@
 #ifndef __OSMP_H__
 #define __OSMP_H__
 
+
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>           /* For O_* constants */
+#include "../util/wrapper/wrapper.h"
+#include "../util/custom/custom.h"
+#include <string.h>
+#include <unistd.h>
+
 /**
  * Alle OSMP-Funktionen liefern im Erfolgsfall OSMP_SUCCESS als Rückgabewert.
  * Weitere Rückgabewerte können mit Begründung (und Dokumentation!) definiert
@@ -24,6 +33,11 @@
  * aber nicht das Programm beenden.
  */
 #define OSMP_FAILURE (!OSMP_SUCCESS)
+
+#define DEFAULT_LOG_FILE "./osmp.log"
+#define DEFAULT_LOG_FILENAME_SIZE 11
+
+
 
 typedef void *OSMP_Request;
 
@@ -105,7 +119,7 @@ int OSMP_GetFailure(void);
  *
  * @return OSMP_SUCCESS
  */
-int OSMP_GetSucess(void);
+int OSMP_GetSuccess(void);
 
 /**
  * Die Funktion OSMP_SizeOf() liefert in *size* die Größe des Datentyps datatype
