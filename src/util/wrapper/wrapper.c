@@ -32,6 +32,16 @@ int _shm_open(const char* name, int oflag, mode_t mode)
     int fd = shm_open(name, oflag, mode);
     if (fd < 0)
     {
+        if (errno == ENOENT)
+        {
+            fd = shm_open(name, oflag | O_CREAT, mode);
+            if (fd < 0)
+            {
+                perror("shm_open: ");
+                exit(EXIT_FAILURE);
+            }
+            return fd;
+        }
         perror("shm_open: ");
         exit(EXIT_FAILURE);
     }
