@@ -17,6 +17,12 @@
 #include "../util/custom/custom.h"
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <pthread.h>
+#include <errno.h>
+#include <stdarg.h>
 
 /**
  * Alle OSMP-Funktionen liefern im Erfolgsfall OSMP_SUCCESS als Rückgabewert.
@@ -34,8 +40,8 @@
  */
 #define OSMP_FAILURE (!OSMP_SUCCESS)
 
-#define DEFAULT_LOG_FILE "./osmp.log"
-#define DEFAULT_LOG_FILENAME_SIZE 11
+// #define DEFAULT_LOG_FILE "./osmp.log"
+// #define DEFAULT_LOG_FILENAME_SIZE 11
 
 
 
@@ -78,10 +84,11 @@ typedef enum OSMP_Datatype {
  * Die OSMP-Logtypen.
  */
 typedef enum OSMP_Verbosity_t {
-  OSMP_LOG_NONE,     // -v 0 nicht mitgegeben.
-  OSMP_LOG_BIB_CALL, // -v 1
-  OSMP_LOG_MEM,      // -v 2
-  OSMP_LOG_FAILS,    // -v 3
+    OSMP_LOG_NONE,     // -v 0 nicht mitgegeben.
+    OSMP_LOG_BIB_CALL, // -v 1
+    OSMP_LOG_MEM,      // -v 2
+    OSMP_LOG_FAILS,    // -v 3
+    OSMP_LOG_INFO,
 } OSMP_Verbosity;
 
 /**

@@ -9,9 +9,16 @@
 #include <string.h>
 #include "../wrapper/wrapper.h"
 
-
-
-
 void sig_child_handler(int signum);
 
+typedef struct node
+{
+    int index;
+    struct node* next;
+}node;
+
+typedef struct
+{
+    node* head;
+}stack;
 #endif
