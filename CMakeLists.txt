@@ -21,6 +21,7 @@ set(LIBRARY_SRC_FILES
     src/osmpLibrary/osmpLib.c
     src/osmpLibrary/osmpLib.h
     src/osmpLibrary/OSMP.h
+        src/osmpExecutables/osmpExecutables_SendRecv.cpp
 )
 add_library(libosmp STATIC ${LIBRARY_SRC_FILES})
 
@@ -41,8 +42,8 @@ set(EXECUTABLES
     # SOURCES <source1> <source2> ...
 )
 
-add_executable(echoAll
-        src/osmpExecutables/echoAll.c
+add_executable(runner
+        src/osmpRunner/osmpRun.c
         src/osmpLibrary/osmpLib.c
         src/osmpLibrary/osmpLib.h
         src/osmpLibrary/OSMP.h
@@ -52,5 +53,7 @@ add_executable(echoAll
         src/util/wrapper/wrapper.h
 )
 
+
+target_link_libraries(runner ${LIBRARIES})
 validate_executables()
 create_executables()
