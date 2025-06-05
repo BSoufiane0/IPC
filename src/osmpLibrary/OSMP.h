@@ -9,6 +9,21 @@
 #ifndef __OSMP_H__
 #define __OSMP_H__
 
+
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>           /* For O_* constants */
+#include "../util/wrapper/wrapper.h"
+#include "../util/custom/custom.h"
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <pthread.h>
+#include <errno.h>
+#include <stdarg.h>
+
 /**
  * Alle OSMP-Funktionen liefern im Erfolgsfall OSMP_SUCCESS als Rückgabewert.
  * Weitere Rückgabewerte können mit Begründung (und Dokumentation!) definiert
@@ -24,6 +39,11 @@
  * aber nicht das Programm beenden.
  */
 #define OSMP_FAILURE (!OSMP_SUCCESS)
+
+// #define DEFAULT_LOG_FILE "./osmp.log"
+// #define DEFAULT_LOG_FILENAME_SIZE 11
+
+
 
 typedef void *OSMP_Request;
 
@@ -41,6 +61,10 @@ typedef void *OSMP_Request;
  * Die maximale Länge der Nutzlast einer Nachricht
  */
 #define OSMP_MAX_PAYLOAD_LENGTH 1024
+
+
+
+typedef enum  { OSMP_READY, OSMP_RUNNING, OSMP_FAIL, OSMP_FINISHED, OSMP_NONE} OOSTATE;
 
 /**
  * Die OSMP-Datentypen entsprechen den C-Datentypen.
@@ -64,10 +88,11 @@ typedef enum OSMP_Datatype {
  * Die OSMP-Logtypen.
  */
 typedef enum OSMP_Verbosity_t {
-  OSMP_LOG_NONE,     // -v 0 nicht mitgegeben.
-  OSMP_LOG_BIB_CALL, // -v 1
-  OSMP_LOG_MEM,      // -v 2
-  OSMP_LOG_FAILS,    // -v 3
+    OSMP_LOG_NONE,     // -v 0 nicht mitgegeben.
+    OSMP_LOG_BIB_CALL, // -v 1
+    OSMP_LOG_MEM,      // -v 2
+    OSMP_LOG_FAILS,    // -v 3
+    OSMP_LOG_INFO,
 } OSMP_Verbosity;
 
 /**
@@ -105,7 +130,7 @@ int OSMP_GetFailure(void);
  *
  * @return OSMP_SUCCESS
  */
-int OSMP_GetSucess(void);
+int OSMP_GetSuccess(void);
 
 /**
  * Die Funktion OSMP_SizeOf() liefert in *size* die Größe des Datentyps datatype
