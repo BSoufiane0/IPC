@@ -6,15 +6,31 @@
  ******************************************************************************/
 
 #include <stdio.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#include <time.h>
 
 #define UNUSED(x) (void)(x);
 
-int main(int argc, char **argv) {
-  UNUSED(argc);
-  UNUSED(argv);
-  fprintf(stdout, "Geben Sie hier die Argumente aus.\n");
 
-  fprintf(stdout, "Nun ein neuer Abschnitt, der die pid und ppid ausgibt.\n");
 
-  return 0;
+void log_event(const char *event, pid_t pid) {
+    FILE *log = fopen("osmp_log.txt", "a");
+    if (log == NULL) {
+        perror("Logdatei konnte nicht geöffnet werden");
+        return;
+    }
+    time_t now = time(NULL);
+    fprintf(log, "[%ld] %s: PID = %d\n", now, event, pid);
+    fclose(log);
 }
+
+int main(int argc, char **argv) {
+
+    printf("echoall prog \n");
+
+    return EXIT_SUCCESS;
+    }
+

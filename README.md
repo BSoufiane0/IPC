@@ -7,7 +7,7 @@
 ## 📋 Inhalt
 
 - [📋 Inhalt](#-inhalt)
-- [🏎️ TL;DR](#️-tldr)
+- [🏎️ Rahmenbedingungen](#️-rahmenbedingungen)
 - [🚨 Wichtiges](#-wichtiges)
 - [🚀 Getting Started](#-getting-started)
 - [🔭 Prerequisites](#-prerequisites)
@@ -18,24 +18,24 @@
   - [Clonen des Projektes](#clonen-des-projektes)
   - [Anfangen zu arbeiten](#anfangen-zu-arbeiten)
 - [🪄 CMake](#-cmake)
-  - [Nutzung von ASAN (AddressSanitizer)](#nutzung-von-asan-addresssanitizer)
+  - [Nutzung der AddressSanitizer](#-nutzung-von-addresssanitizern)
   - [Hinzufügen von osmpExecutables](#hinzufügen-von-osmpexecutables)
 - [🏗️ Projekt bauen](#️-projekt-bauen)
   - [Manuell über das Terminal](#manuell-über-das-terminal)
   - [CLion](#clion)
   - [VScode](#vscode)
 
-## 🏎️ TL;DR
+## 🏎️ Rahmenbedingungen
 
-1. Im Praktikumstermin auf den Laborrechnern arbeiten.
-2. Sie können nicht auf die Laborrechner zugreifen.
-3. Das Projekt muss auf den Laborrechnern fehlerfrei kompilieren und laufen.
-4. Mit Git, GitLab, SSH-Keys, CMake und GCC vertraut machen.
-5. **git**, **cmake** und **gcc** installieren
-6. Projekt klonen (`git clone <link>`)
-7. In das Projektverzeichnis wechseln (`cd <projektordner>`)
-8. Projekt bauen (`cmake -S . -B build -D CMAKE_VERBOSE_MAKEFILE=ON && cmake --build .`)
-9. Executable ausführen (`./build/<executable>`)
+1. Im Praktikumstermin soll auf den Laborrechnern gearbeitet werden.
+2. Das Projekt muss auf den Laborrechnern fehlerfrei kompilieren und laufen.
+3. Sie können außerhalb ihres Termins nicht auf die Laborrechner zugreifen.
+4. Verwenden von Git mit SSH-Key um Quelltexte und Dokumentation im Team zu nutzen.
+5. Verwendung von CMake und GCC zum bauen des Projekts.
+6. Für Zuhause: **git**, **cmake** und **gcc** installieren
+7. Template des Projekts als Basis klonen (`git clone <link>`)
+8. Hinweise zum bauen des Projekts in der Anleitung und hier beachten.
+9. Zum Testen der implementierten Funktionen passende Executables scheiben und ausführen.
 
 ## 🚨 Wichtiges
 
@@ -126,8 +126,143 @@ Ansonsten können Sie das Projekt nach Ihren Wünschen anpassen!
 CMake ist ein Build-System-Generator.
 Es erstellt aus einer CMake-Datei (CMakeLists.txt) ein Build-System, das dann genutzt werden kann, um das Projekt zu bauen.
 
-### Nutzung von ASAN (AddressSanitizer)
+## 🏗️ Projekt bauen
 
+Das Projekt wird mit CMake gebaut. Es lässt sich sowohl mauel im Terminal bauen, als auch mit einer der vorhandenen IDEs.
+Auf unseren Rechnern ist u.a. CLion und VS-Code  installiert.
+
+### Projekt manuell über das Terminal bauen
+
+Das Projekt lässt sich wie folgt manuell per CMake bauen
+
+CMake: [https://cmake.org/getting-started/](https://cmake.org/getting-started/)
+
+```sh
+cd /pfad/zum/projektordner
+
+# Konfigurieren des Projekts
+cmake -S . -B build -D CMAKE_VERBOSE_MAKEFILE=ON
+
+Erzeugt ein neues Buildsystem im Verzeichnis build, basierend auf der CMakeLists.txt im aktuellen Verzeichnis. 
+Es stellt sicher, dass beim späteren Aufruf von make oder cmake --build alle tatsächlichen Kommandos (wie gcc ...) angezeigt werden.
+
+cmake: Startet das CMake-Programm, um ein Buildsystem zu erzeugen (z. B. Makefiles oder Ninja-Dateien).
+
+-S . : Setzt das Quellverzeichnis (Source Directory), also der Ort, an dem die CMakeLists.txt liegt. Hier: das aktuelle Verzeichnis (.).
+
+-B build: Setzt das Build-Verzeichnis – also der Ort, an dem CMake alle generierten Dateien ablegt (Makefiles, Cache usw.). Hier: das Unterverzeichnis build.
+          CMake erzeugt dieses Verzeichnis, falls es nicht existiert.
+          
+-D CMAKE_VERBOSE_MAKEFILE=ON: Diese Option setzt die CMake-Variable CMAKE_VERBOSE_MAKEFILE auf ON.
+          Das bewirkt, das bei jedem Build der komplette Compiler- und Linker-Befehl ausgegeben wird.
+
+
+# Bauen der Binaries
+cmake --build build
+```
+
+## 🔍  Sanitizer im Build-Prozess
+
+Dieses Projekt enthält eine CMake-Funktion `enable_sanitizers(...)`, mit der sich zur Debug-Zeit verschiedene **Sanitizer** aktivieren lassen. Diese helfen dabei, häufige Fehler wie Speicherlecks, undefiniertes Verhalten, Pufferüberläufe oder Datenrennen zur Laufzeit zu erkennen.
+
+### 🛠️ Verfügbare Sanitizer
+
+Die Funktion unterstützt u. a. folgende [GCC 12.3-kompatible](https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html) Sanitizer (bitte prüfen, ob der verwendete Compiler diese auf Ihrer Plattform unterstützt):
+
+```cmake
+function(enable_sanitizers SANITIZER_LIST)
+    set(VALID_SANITIZERS
+        address leak thread undefined
+        bounds bool object-size vla-bound
+        shift shift-base
+        integer-divide-by-zero float-divide-by-zero
+        signed-integer-overflow
+        pointer-compare pointer-subtract
+        returns-nonnull-attribute nonnull-attribute
+        vptr
+    )
+```
+
+> ⚠️ Hinweis: Der Sanitizer `memory` ist **nicht mit GCC kompatibel** (nur unter Clang und bestimmten Plattformen verfügbar) und wird daher nicht unterstützt.
+
+---
+
+### 💡 CMake-Aufrufe zur Konfiguration
+
+#### 🔁 Ersteinrichtung (außerhalb des Build-Verzeichnisses)
+
+```bash
+cmake -S . -B build -D CMAKE_BUILD_TYPE=Debug -DSANITIZER=thread
+```
+
+#### 📦 Re-Konfiguration aus dem Build-Verzeichnis
+
+```bash
+cd build
+cmake ..
+```
+
+### 🧪 Nutzung von AddressSanitizern
+
+
+```bash
+
+# Beispiele für Debug-Builds mit verschiedenen Sanitizern
+
+# Nur Debug-Modus, keine Sanitizer
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=none ..
+
+# Klassiker: Adressfehler, Speicherlecks, undefiniertes Verhalten
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=address,leak,undefined ..
+
+# Nur Thread-Sanitizer (Datenrennen)
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=thread ..
+
+# Laufzeitprüfung Speicherfehler (address), undefiniertem Verhalten (undefined), Speicherlecks (leak), 
+# Arraygrenzen (bounds), fehlerhaften booleschen Werten (bool) und variablen Längenarrays (vla-bound).
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=address,undefined,leak,bounds,bool,vla-bound ..
+
+# Kombination mit Pointer-Prüfungen
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=address,pointer-compare,pointer-subtract ..
+
+
+```
+
+---
+
+### ✅ Weitere gültige Kombinationen
+
+```bash
+# Integer-Division durch 0 und Shift-Fehler erkennen
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=integer-divide-by-zero,shift ..
+
+# Überlauf von signed ints + Object-Size Checks
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=signed-integer-overflow,object-size ..
+
+# Erkennung ungültiger Rückgabewerte bei Nonnull-Attributen
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=nonnull-attribute,returns-nonnull-attribute ..
+
+# Erkennung von Fehlern bei virtuellen Funktionszeigern (C++ only)
+cmake -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=vptr ..
+```
+
+---
+
+### 🧭 Zusätzliche Hinweise
+
+- Die Option `CMAKE_VERBOSE_MAKEFILE=ON` kann hilfreich sein, um alle Compiler-Flags sichtbar zu machen:
+
+  ```bash
+  cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+  ```
+
+- Der verwendete Compiler und die Plattform bestimmen, welche Kombinationen wirklich funktionieren. **Nicht alle Sanitizer sind unter GCC oder auf jeder Architektur vollständig unterstützt.**
+
+- Die Option `-DSANITIZER=none` deaktiviert explizit alle zusätzlichen Prüfroutinen.
+
+
+In einer ersten Version gab es die Möglichkeit den Sanitizer ASAN nur mit "OFF" und "ON" zu konfigurieren. Die Funktion ist zwar noch
+vorhanden, wir empfehlen aber die erweiterten Möglichkeiten mit mehreren Sanitizern zu nutzen. 
 Sie haben die Möglichkeit, den [AddressSanitizer](https://github.com/google/sanitizers/wiki/addresssanitizer) (ASAN) zu nutzen, um Speicherfehler zu finden.
 ASAN ist ein Werkzeug, das in modernen GCC- und Clang-Compilern enthalten ist.
 Es kann verwendet werden, um Speicherfehler wie Buffer Overflows, Undefiniertes Verhalten und Speicherlecks zu finden.
@@ -139,7 +274,7 @@ option(USE_ASAN "AddressSanitizer aktivieren" OFF)
 compile_with_asan(${USE_ASAN})
 ```
 
-Um ASAN zu nutzen, müssen Sie die CMake-Variable `USE_ASAN` auf `ON` setzen.
+Um ASAN zu nutzen, müssten die obenstehenden Zeilen zur CMakeFile.txt hinzugefügt werden und die CMake-Variable `USE_ASAN` auf `ON` gesetzt weren.
 
 Dazu können Sie entweder die Variable in der CMakeLists.txt setzen oder beim Aufruf von CMake die Variable setzen (z. B. `cmake -DUSE_ASAN=ON ...`).
 
@@ -151,7 +286,7 @@ Um eine Executable hinzuzufügen, muss die [CMakeLists.txt](./CMakeLists.txt) be
 #== Executables ==#
 set(EXECUTABLES
     NAME osmprun
-    SOURCES src/osmp_runner/osmp_run.c src/osmp_runner/osmp_run.h
+    SOURCES src/osmpRunner/osmpRun.c src/osmpRunner/osmpRun.h
     NAME echoall
     SOURCES src/osmpExecutables/echoAll.c
     # Neue Executables hier einfügen
@@ -175,25 +310,6 @@ SOURCES <Source-Dateien>
 Über den Namen steuern Sie, wie die ausführbare Datei heißt.
 Diese Datei werden Sie dann in dem build Ordner finden (z. B. "build", "cmake-build-debug" oder "cmake-build-release").
 
-## 🏗️ Projekt bauen
-
-Das Projekt wird mit CMake gebaut. Sie können die IDE frei wählen.
-
-### Manuell über das Terminal
-
-Das Projekt lässt sich wie folgt manuell per CMake bauen
-
-CMake: [https://cmake.org/getting-started/](https://cmake.org/getting-started/)
-
-```sh
-cd /pfad/zum/projektordner
-
-# Konfigurieren des Projekts
-cmake -S . -B build -D CMAKE_VERBOSE_MAKEFILE=ON
-
-# Bauen der Binaries
-cmake --build build
-```
 
 ### CLion
 
