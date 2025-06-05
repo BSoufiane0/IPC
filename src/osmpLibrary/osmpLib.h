@@ -17,6 +17,14 @@
 #define DEFAULT_LOG_FILE "/home/kali/Workspace/BS/team_25/src/logs/osmp.log"
 #define DEFAULT_LOG_FILENAME_SIZE strlen("/home/kali/Workspace/BS/team_25/src/logs/osmp.log")+1
 
+typedef struct {
+    int count;
+    int cycle;
+    int valid;
+    int threshold;
+    pthread_mutex_t barrier_Mutex;
+    pthread_cond_t condition;
+} barrier_t;
 
 /** Structure of a message slot */
 typedef struct {
@@ -37,8 +45,8 @@ typedef struct {
 
 /* Structure of a process */
 typedef struct {
-    int pid; // Process ID
-    int rank;
+    pid_t pid; // Process ID
+    pid_t rank;
     // Incoming posts for the process 16, it should be used as a ring buffer.
     // that has two indexes: proc_in and proc_out
     int PostEingang[OSMP_MAX_MESSAGES_PROC];
@@ -48,8 +56,10 @@ typedef struct {
     pthread_mutex_t out_mutex;
     int buffer_len; // Length of the buffer
     pthread_mutex_t mutex_buffer_len; // Mutex for the buffer length
-    sem_t is_pool_empty;
-    sem_t is_pool_full;
+    sem_t sem_proc_empty;
+    sem_t sem_proc_full;
+    MessageSlot gather_slot; // Gather message for the process
+    pthread_mutex_t mutex_gather_slot; // mutex synchronizer
 } Prozess;
 
 /* Structure of the Shared Memory */
@@ -60,11 +70,34 @@ typedef struct { // the fields should be initialized at the runner ...
     Freelist_t freelst;
     int next_ps_entry ; // the next entry in Prozess array
     MessageSlot msg[OSMP_MAX_SLOTS]; // Array of message slots 256
-
+    barrier_t barrier;//
+    barrier_t barriergather;
     pthread_mutex_t mutex; // Mutex for the shared memory
     pthread_mutex_t log_mutex;
     Prozess P[]; // Array of processes
 } SharedMemory;
+
+
+typedef struct {
+    pthread_t thread;// Thread ID
+    OOSTATE status_flag; // Status of the request
+    const void *sendBuffer; // Buffer used for both send and receive
+    int count;// Number of elements of a data type
+    int destRank; // Rank of the receiver of a message
+    int* source;// Pointer to the rank of the sender
+    int* len; // Pointer to the length of the message
+    OSMP_Datatype datatype;// Data type of the message
+    pthread_mutex_t request_mutex; // Binary semaphore to handle the status flag
+    sem_t quit;// Binary semaphore to end the operation and free the memory
+} Request;
+
+
+/*Dynamic List to mark created requests (OSMP_CreateRequest) and removed requests (OSMP_RemoveRequest)*/
+typedef struct {
+    Request *request;
+    struct RequestNode *next;
+} RequestNode;
+
 
 
 // this manager pack all neccessary shared Memory meta-data ...
@@ -81,6 +114,7 @@ typedef struct
 
 extern ShmMemoryManager shm_manager;
 
+/** Structure of the barrier_t */
 
 /* Information about non-blocking operations */
 
@@ -168,6 +202,9 @@ void initialize_process_data(SharedMemory *ptr);
  */
 int cleanup_resources(SharedMemory *ptr, int prozessAnzahl);
 
+int OSMP_Barrier(void);
+int OSMP_BarrierGather(void);
+int OSMP_Gather(void *sendbuf, int sendcount, OSMP_Datatype sendtype, void *recvbuf, int recvcount, OSMP_Datatype recvtype, int root) ;
 
 #endif //BETRIEBSSYSTEME_OSMPLIB_H
 

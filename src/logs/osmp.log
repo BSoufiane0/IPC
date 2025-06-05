@@ -1,244 +1,159 @@
-[2025-05-14 23:09:11] --  -- ================================
+[2025-06-04 18:45:09] --  -- ================================
 
 
 
-[2025-05-14 23:09:11] -- OSMP_LOG_NONE -- SHM initialized successfully
-[2025-05-14 23:09:11] --  -- process synchronization stuff of 0 initialized
-[2025-05-14 23:09:11] --  -- process synchronization stuff of 1 initialized
-[2025-05-14 23:09:11] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
-[2025-05-14 23:09:11] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
-[2025-05-14 23:09:11] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:11] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:11] --  -- rank(1):called OSMP_Size()
-[2025-05-14 23:09:11] --  -- called OSMP_Rank()
-[2025-05-14 23:09:11] --  -- called OSMP_Recv()
-[2025-05-14 23:09:11] --  -- called OSMP_Rank()
-[2025-05-14 23:09:11] --  -- rank(1):recv message components checked
-[2025-05-14 23:09:11] --  -- rank(1):recv message waiting for pool full event
-[2025-05-14 23:09:11] --  -- rank(0):called OSMP_Size()
-[2025-05-14 23:09:11] --  -- called OSMP_Rank()
-[2025-05-14 23:09:11] --  -- called OSMP_Send()
-[2025-05-14 23:09:11] --  -- called OSMP_Rank()
-[2025-05-14 23:09:11] --  -- rank(0):send message component validation passed
-[2025-05-14 23:09:11] --  -- rank(0):send message to rank(1)
-[2025-05-14 23:09:11] --  -- rank(0):send message waiting for empty pool semaphore
-[2025-05-14 23:09:11] --  -- rank(0):send message empty pool semaphore unlocked
-[2025-05-14 23:09:11] --  -- rank(0):send message lock buffer in/out mutexes
-[2025-05-14 23:09:11] --  -- rank(0):send message pool not full
-[2025-05-14 23:09:11] --  -- rank(0):send message slot 255 is free
-[2025-05-14 23:09:11] --  -- rank(0):send message data is written
-[2025-05-14 23:09:11] --  -- rank(0): memcpy src=0x7ffc60baee38, dest=0x7f5dfbf7ec5c, size=8
-[2025-05-14 23:09:11] --  -- rank(0):send message data is sent
-[2025-05-14 23:09:11] --  -- rank(0):send message trigger pool full signal
-[2025-05-14 23:09:11] --  -- rank(0):send message ends
-[2025-05-14 23:09:11] --  -- rank(1):recv message pool is full is triggered
-[2025-05-14 23:09:11] --  -- rank(1):send message slot is checked
-[2025-05-14 23:09:11] --  -- rank(1):send message data is read
-[2025-05-14 23:09:11] --  -- rank(1):recv message trigger is empty event
-[2025-05-14 23:09:11] --  -- rank(1):recv message release busy slot
-[2025-05-14 23:09:11] --  -- rank(1):recv message ends
-[2025-05-14 23:09:11] -- OSMP_LOG_NONE -- all processes are finished
-[2025-05-14 23:09:17] --  -- ================================
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- SHM initialized successfully
+[2025-06-04 18:45:09] --  -- process synchronization stuff of 0 initialized
+[2025-06-04 18:45:09] --  -- process synchronization stuff of 1 initialized
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
+[2025-06-04 18:45:09] --  -- ========PID IN fill_shm: 28598
+[2025-06-04 18:45:09] --  -- ========PID IN fill_shm: 28599
+[2025-06-04 18:45:09] --  -- RANK = 0, pid = 28598, current_pid = 28598
+[2025-06-04 18:45:09] --  -- RANK = 0, pid = 28598, current_pid = 28598
+[2025-06-04 18:45:09] --  -- rank(0):called OSMP_Size()
+[2025-06-04 18:45:09] --  -- called OSMP_Rank()
+[2025-06-04 18:45:09] --  -- called OSMP_Send()
+[2025-06-04 18:45:09] --  -- called OSMP_Rank()
+[2025-06-04 18:45:09] --  -- rank(0):send message component validation passed
+[2025-06-04 18:45:09] --  -- rank(0):send message to rank(1)
+[2025-06-04 18:45:09] --  -- RANK = 0, pid = 28598, current_pid = 28599
+[2025-06-04 18:45:09] --  -- rank(0):send message waiting for empty pool semaphore
+[2025-06-04 18:45:09] --  -- RANK = 1, pid = 28599, current_pid = 28599
+[2025-06-04 18:45:09] --  -- rank(0):send message empty pool semaphore unlocked
+[2025-06-04 18:45:09] --  -- RANK = 0, pid = 28598, current_pid = 28599
+[2025-06-04 18:45:09] --  -- rank(0):send message slot 255 is free
+[2025-06-04 18:45:09] --  -- RANK = 1, pid = 28599, current_pid = 28599
+[2025-06-04 18:45:09] --  -- rank(1):called OSMP_Size()
+[2025-06-04 18:45:09] --  -- rank(0):send message data is written
+[2025-06-04 18:45:09] --  -- called OSMP_Rank()
+[2025-06-04 18:45:09] --  -- rank(0): memcpy src=0x562ef4b366b0, dest=0x7f033af7fc5c, size=61
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- called OSMP_CreateRequest()
+[2025-06-04 18:45:09] --  -- rank(0):send message data is sent
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- called OSMP_IRecv()
+[2025-06-04 18:45:09] --  -- rank(0):send message lock buffer in/out mutexes
+[2025-06-04 18:45:09] --  -- rank(0):send message pool not full
+[2025-06-04 18:45:09] --  -- rank(0):send message trigger pool full signal
+[2025-06-04 18:45:09] --  -- rank(0):send message ends
+[2025-06-04 18:45:09] --  -- -- OSMP_Finalize() called --
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- called OSMP_Wait()
+[2025-06-04 18:45:09] --  -- called OSMP_Recv()
+[2025-06-04 18:45:09] --  -- called OSMP_Rank()
+[2025-06-04 18:45:09] --  -- rank(1):recv message components checked
+[2025-06-04 18:45:09] --  -- rank(1):recv message waiting for pool full event
+[2025-06-04 18:45:09] --  -- rank(1):recv message pool is full is triggered
+[2025-06-04 18:45:09] --  -- rank(1):send message slot is checked
+[2025-06-04 18:45:09] --  -- rank(1):send message data is read
+[2025-06-04 18:45:09] --  -- rank(1):recv message trigger is empty event
+[2025-06-04 18:45:09] --  -- rank(1):recv message release busy slot
+[2025-06-04 18:45:09] --  -- received msg: hello from 0 rank to the 1 rank through Asynchron library ...
+[2025-06-04 18:45:09] --  -- rank(1):recv message ends
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- called OSMP_RemoveRequest()
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- called free on requestStruct
+[2025-06-04 18:45:09] --  -- -- OSMP_Finalize() called --
+[2025-06-04 18:45:09] -- OSMP_LOG_NONE -- all processes are finished
+[2025-06-04 18:50:53] --  -- ================================
 
 
 
-[2025-05-14 23:09:17] -- OSMP_LOG_NONE -- SHM initialized successfully
-[2025-05-14 23:09:17] --  -- process synchronization stuff of 0 initialized
-[2025-05-14 23:09:17] --  -- process synchronization stuff of 1 initialized
-[2025-05-14 23:09:17] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
-[2025-05-14 23:09:17] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:17] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
-[2025-05-14 23:09:17] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:17] --  -- rank(1):called OSMP_Size()
-[2025-05-14 23:09:17] --  -- called OSMP_Rank()
-[2025-05-14 23:09:17] --  -- called OSMP_Recv()
-[2025-05-14 23:09:17] --  -- rank(0):called OSMP_Size()
-[2025-05-14 23:09:17] --  -- called OSMP_Rank()
-[2025-05-14 23:09:17] --  -- called OSMP_Rank()
-[2025-05-14 23:09:17] --  -- rank(1):recv message components checked
-[2025-05-14 23:09:17] --  -- called OSMP_Send()
-[2025-05-14 23:09:17] --  -- rank(1):recv message waiting for pool full event
-[2025-05-14 23:09:17] --  -- called OSMP_Rank()
-[2025-05-14 23:09:17] --  -- rank(0):send message component validation passed
-[2025-05-14 23:09:17] --  -- rank(0):send message to rank(1)
-[2025-05-14 23:09:17] --  -- rank(0):send message waiting for empty pool semaphore
-[2025-05-14 23:09:17] --  -- rank(0):send message empty pool semaphore unlocked
-[2025-05-14 23:09:17] --  -- rank(0):send message lock buffer in/out mutexes
-[2025-05-14 23:09:17] --  -- rank(0):send message pool not full
-[2025-05-14 23:09:17] --  -- rank(0):send message slot 255 is free
-[2025-05-14 23:09:17] --  -- rank(0):send message data is written
-[2025-05-14 23:09:17] --  -- rank(0): memcpy src=0x7ffd49e6f518, dest=0x7f36b6763c5c, size=8
-[2025-05-14 23:09:17] --  -- rank(0):send message data is sent
-[2025-05-14 23:09:17] --  -- rank(0):send message trigger pool full signal
-[2025-05-14 23:09:17] --  -- rank(0):send message ends
-[2025-05-14 23:09:17] --  -- rank(1):recv message pool is full is triggered
-[2025-05-14 23:09:17] --  -- rank(1):send message slot is checked
-[2025-05-14 23:09:17] --  -- rank(1):send message data is read
-[2025-05-14 23:09:17] --  -- rank(1):recv message trigger is empty event
-[2025-05-14 23:09:17] --  -- rank(1):recv message release busy slot
-[2025-05-14 23:09:17] --  -- rank(1):recv message ends
-[2025-05-14 23:09:17] -- OSMP_LOG_NONE -- all processes are finished
-[2025-05-14 23:09:18] --  -- ================================
+[2025-06-04 18:50:53] -- OSMP_LOG_NONE -- SHM initialized successfully
+[2025-06-04 18:50:53] --  -- process synchronization stuff of 0 initialized
+[2025-06-04 18:50:53] --  -- process synchronization stuff of 1 initialized
+[2025-06-04 18:50:53] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
+[2025-06-04 18:50:53] --  -- ========PID IN fill_shm: 29358
+[2025-06-04 18:50:53] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
+[2025-06-04 18:50:53] --  -- ========PID IN fill_shm: 29359
+[2025-06-04 18:50:53] --  -- RANK = 0, pid = 29358, current_pid = 29358
+[2025-06-04 18:50:53] --  -- RANK = 0, pid = 29358, current_pid = 29358
+[2025-06-04 18:50:53] --  -- rank(0):called OSMP_Size()
+[2025-06-04 18:50:53] --  -- called OSMP_Rank()
+[2025-06-04 18:50:53] --  -- called OSMP_Send()
+[2025-06-04 18:50:53] --  -- called OSMP_Rank()
+[2025-06-04 18:50:53] --  -- rank(0):send message component validation passed
+[2025-06-04 18:50:53] --  -- rank(0):send message to rank(1)
+[2025-06-04 18:50:53] --  -- rank(0):send message waiting for empty pool semaphore
+[2025-06-04 18:50:53] --  -- rank(0):send message empty pool semaphore unlocked
+[2025-06-04 18:50:53] --  -- rank(0):send message slot 255 is free
+[2025-06-04 18:50:53] --  -- rank(0):send message data is written
+[2025-06-04 18:50:53] --  -- rank(0): memcpy src=0x55685be1c6b0, dest=0x7f38acf52c5c, size=61
+[2025-06-04 18:50:53] --  -- rank(0):send message data is sent
+[2025-06-04 18:50:53] --  -- rank(0):send message lock buffer in/out mutexes
+[2025-06-04 18:50:53] --  -- rank(0):send message pool not full
+[2025-06-04 18:50:53] --  -- rank(0):send message trigger pool full signal
+[2025-06-04 18:50:53] --  -- rank(0):send message ends
+[2025-06-04 18:50:53] --  -- -- OSMP_Finalize() called --
+[2025-06-04 18:50:53] --  -- RANK = 0, pid = -1, current_pid = 29359
+[2025-06-04 18:50:53] --  -- RANK = 1, pid = 29359, current_pid = 29359
+[2025-06-04 18:50:53] --  -- RANK = 0, pid = -1, current_pid = 29359
+[2025-06-04 18:50:53] --  -- RANK = 1, pid = 29359, current_pid = 29359
+[2025-06-04 18:50:53] --  -- rank(1):called OSMP_Size()
+[2025-06-04 18:50:53] --  -- called OSMP_Rank()
+[2025-06-04 18:50:53] -- OSMP_LOG_NONE -- called OSMP_CreateRequest()
+[2025-06-04 18:50:53] -- OSMP_LOG_NONE -- called OSMP_IRecv()
+[2025-06-04 18:50:53] -- OSMP_LOG_NONE -- called OSMP_Wait()
+[2025-06-04 18:50:53] --  -- called OSMP_Recv()
+[2025-06-04 18:50:53] --  -- called OSMP_Rank()
+[2025-06-04 18:50:53] --  -- rank(1):recv message components checked
+[2025-06-04 18:50:53] --  -- rank(1):recv message waiting for pool full event
+[2025-06-04 18:50:53] --  -- rank(1):recv message pool is full is triggered
+[2025-06-04 18:50:53] --  -- rank(1):send message slot is checked
+[2025-06-04 18:50:53] --  -- rank(1):send message data is read
+[2025-06-04 18:50:53] --  -- rank(1):recv message trigger is empty event
+[2025-06-04 18:50:53] --  -- rank(1):recv message release busy slot
+[2025-06-04 18:50:53] --  -- received msg: hello from 0 rank to the 1 rank through Asynchron library ...
+[2025-06-04 18:50:53] --  -- rank(1):recv message ends
+[2025-06-04 18:50:53] -- OSMP_LOG_NONE -- called OSMP_Wait()
+[2025-06-04 18:51:36] --  -- ================================
 
 
 
-[2025-05-14 23:09:18] -- OSMP_LOG_NONE -- SHM initialized successfully
-[2025-05-14 23:09:18] --  -- process synchronization stuff of 0 initialized
-[2025-05-14 23:09:18] --  -- process synchronization stuff of 1 initialized
-[2025-05-14 23:09:18] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
-[2025-05-14 23:09:18] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
-[2025-05-14 23:09:18] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:18] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:18] --  -- rank(0):called OSMP_Size()
-[2025-05-14 23:09:18] --  -- called OSMP_Rank()
-[2025-05-14 23:09:18] --  -- called OSMP_Send()
-[2025-05-14 23:09:18] --  -- called OSMP_Rank()
-[2025-05-14 23:09:18] --  -- rank(0):send message component validation passed
-[2025-05-14 23:09:18] --  -- rank(1):called OSMP_Size()
-[2025-05-14 23:09:18] --  -- called OSMP_Rank()
-[2025-05-14 23:09:18] --  -- called OSMP_Recv()
-[2025-05-14 23:09:18] --  -- called OSMP_Rank()
-[2025-05-14 23:09:18] --  -- rank(1):recv message components checked
-[2025-05-14 23:09:18] --  -- rank(1):recv message waiting for pool full event
-[2025-05-14 23:09:18] --  -- rank(0):send message to rank(1)
-[2025-05-14 23:09:18] --  -- rank(0):send message waiting for empty pool semaphore
-[2025-05-14 23:09:18] --  -- rank(0):send message empty pool semaphore unlocked
-[2025-05-14 23:09:18] --  -- rank(0):send message lock buffer in/out mutexes
-[2025-05-14 23:09:18] --  -- rank(0):send message pool not full
-[2025-05-14 23:09:18] --  -- rank(0):send message slot 255 is free
-[2025-05-14 23:09:18] --  -- rank(0):send message data is written
-[2025-05-14 23:09:18] --  -- rank(0): memcpy src=0x7ffd63bb2fb8, dest=0x7fa997189c5c, size=8
-[2025-05-14 23:09:18] --  -- rank(0):send message data is sent
-[2025-05-14 23:09:18] --  -- rank(0):send message trigger pool full signal
-[2025-05-14 23:09:18] --  -- rank(0):send message ends
-[2025-05-14 23:09:18] --  -- rank(1):recv message pool is full is triggered
-[2025-05-14 23:09:18] --  -- rank(1):send message slot is checked
-[2025-05-14 23:09:18] --  -- rank(1):send message data is read
-[2025-05-14 23:09:18] --  -- rank(1):recv message trigger is empty event
-[2025-05-14 23:09:18] --  -- rank(1):recv message release busy slot
-[2025-05-14 23:09:18] --  -- rank(1):recv message ends
-[2025-05-14 23:09:18] -- OSMP_LOG_NONE -- all processes are finished
-[2025-05-14 23:09:20] --  -- ================================
-
-
-
-[2025-05-14 23:09:20] -- OSMP_LOG_NONE -- SHM initialized successfully
-[2025-05-14 23:09:20] --  -- process synchronization stuff of 0 initialized
-[2025-05-14 23:09:20] --  -- process synchronization stuff of 1 initialized
-[2025-05-14 23:09:20] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
-[2025-05-14 23:09:20] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
-[2025-05-14 23:09:20] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:20] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:09:20] --  -- rank(1):called OSMP_Size()
-[2025-05-14 23:09:20] --  -- rank(0):called OSMP_Size()
-[2025-05-14 23:09:20] --  -- called OSMP_Rank()
-[2025-05-14 23:09:20] --  -- called OSMP_Rank()
-[2025-05-14 23:09:20] --  -- called OSMP_Recv()
-[2025-05-14 23:09:20] --  -- called OSMP_Send()
-[2025-05-14 23:09:20] --  -- called OSMP_Rank()
-[2025-05-14 23:09:20] --  -- called OSMP_Rank()
-[2025-05-14 23:09:20] --  -- rank(1):recv message components checked
-[2025-05-14 23:09:20] --  -- rank(0):send message component validation passed
-[2025-05-14 23:09:20] --  -- rank(1):recv message waiting for pool full event
-[2025-05-14 23:09:20] --  -- rank(0):send message to rank(1)
-[2025-05-14 23:09:20] --  -- rank(0):send message waiting for empty pool semaphore
-[2025-05-14 23:09:20] --  -- rank(0):send message empty pool semaphore unlocked
-[2025-05-14 23:09:20] --  -- rank(0):send message lock buffer in/out mutexes
-[2025-05-14 23:09:20] --  -- rank(0):send message pool not full
-[2025-05-14 23:09:20] --  -- rank(0):send message slot 255 is free
-[2025-05-14 23:09:20] --  -- rank(0):send message data is written
-[2025-05-14 23:09:20] --  -- rank(0): memcpy src=0x7ffd5815cb68, dest=0x7fd4da927c5c, size=8
-[2025-05-14 23:09:20] --  -- rank(0):send message data is sent
-[2025-05-14 23:09:20] --  -- rank(0):send message trigger pool full signal
-[2025-05-14 23:09:20] --  -- rank(0):send message ends
-[2025-05-14 23:09:20] --  -- rank(1):recv message pool is full is triggered
-[2025-05-14 23:09:20] --  -- rank(1):send message slot is checked
-[2025-05-14 23:09:20] --  -- rank(1):send message data is read
-[2025-05-14 23:09:20] --  -- rank(1):recv message trigger is empty event
-[2025-05-14 23:09:20] --  -- rank(1):recv message release busy slot
-[2025-05-14 23:09:20] --  -- rank(1):recv message ends
-[2025-05-14 23:09:20] -- OSMP_LOG_NONE -- all processes are finished
-[2025-05-14 23:56:35] --  -- ================================
-
-
-
-[2025-05-14 23:56:35] -- OSMP_LOG_NONE -- SHM initialized successfully
-[2025-05-14 23:56:35] --  -- process synchronization stuff of 0 initialized
-[2025-05-14 23:56:35] --  -- process synchronization stuff of 1 initialized
-[2025-05-14 23:56:35] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
-[2025-05-14 23:56:35] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
-[2025-05-14 23:56:35] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:56:35] -- OSMP_LOG_NONE -- fork child
-[2025-05-14 23:56:35] --  -- rank(0):called OSMP_Size()
-[2025-05-14 23:56:35] --  -- called OSMP_Rank()
-[2025-05-14 23:56:35] --  -- called OSMP_Send()
-[2025-05-14 23:56:35] --  -- called OSMP_Rank()
-[2025-05-14 23:56:35] --  -- rank(0):send message component validation passed
-[2025-05-14 23:56:35] --  -- rank(0):send message to rank(1)
-[2025-05-14 23:56:35] --  -- rank(0):send message waiting for empty pool semaphore
-[2025-05-14 23:56:35] --  -- rank(0):send message empty pool semaphore unlocked
-[2025-05-14 23:56:35] --  -- rank(0):send message lock buffer in/out mutexes
-[2025-05-14 23:56:35] --  -- rank(0):send message pool not full
-[2025-05-14 23:56:35] --  -- rank(0):send message slot 255 is free
-[2025-05-14 23:56:35] --  -- rank(0):send message data is written
-[2025-05-14 23:56:35] --  -- rank(0): memcpy src=0x7ffd5985eef0, dest=0x7ff3d5458c5c, size=1024
-[2025-05-14 23:56:35] --  -- rank(0):send message data is sent
-[2025-05-14 23:56:35] --  -- rank(0):send message trigger pool full signal
-[2025-05-14 23:56:35] --  -- rank(0):send message ends
-[2025-05-14 23:56:35] --  -- -- OSMP_Finalize() called --
-[2025-05-14 23:56:35] --  -- rank(1):called OSMP_Size()
-[2025-05-14 23:56:35] --  -- called OSMP_Rank()
-[2025-05-14 23:56:35] --  -- called OSMP_Recv()
-[2025-05-14 23:56:35] --  -- called OSMP_Rank()
-[2025-05-14 23:56:35] --  -- rank(1):recv message components checked
-[2025-05-14 23:56:35] --  -- rank(1):recv message waiting for pool full event
-[2025-05-14 23:56:35] --  -- rank(1):recv message pool is full is triggered
-[2025-05-14 23:56:35] --  -- rank(1):send message slot is checked
-[2025-05-14 23:56:35] --  -- rank(1):send message data is read
-[2025-05-14 23:56:35] --  -- rank(1):recv message trigger is empty event
-[2025-05-14 23:56:35] --  -- rank(1):recv message release busy slot
-[2025-05-14 23:56:35] --  -- rank(1):recv message ends
-[2025-05-14 23:56:35] --  -- -- OSMP_Finalize() called --
-[2025-05-14 23:56:35] -- OSMP_LOG_NONE -- all processes are finished
-[2025-05-15 08:39:58] --  -- ================================
-
-
-
-[2025-05-15 08:39:58] -- OSMP_LOG_NONE -- SHM initialized successfully
-[2025-05-15 08:39:58] --  -- process synchronization stuff of 0 initialized
-[2025-05-15 08:39:58] --  -- process synchronization stuff of 1 initialized
-[2025-05-15 08:39:58] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
-[2025-05-15 08:39:58] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
-[2025-05-15 08:39:58] -- OSMP_LOG_NONE -- fork child
-[2025-05-15 08:39:58] -- OSMP_LOG_NONE -- fork child
-[2025-05-15 08:39:58] --  -- rank(1):called OSMP_Size()
-[2025-05-15 08:39:58] --  -- called OSMP_Rank()
-[2025-05-15 08:39:58] --  -- called OSMP_Recv()
-[2025-05-15 08:39:58] --  -- called OSMP_Rank()
-[2025-05-15 08:39:58] --  -- rank(1):recv message components checked
-[2025-05-15 08:39:58] --  -- rank(1):recv message waiting for pool full event
-[2025-05-15 08:39:58] --  -- rank(0):called OSMP_Size()
-[2025-05-15 08:39:58] --  -- called OSMP_Rank()
-[2025-05-15 08:39:58] --  -- called OSMP_Send()
-[2025-05-15 08:39:58] --  -- called OSMP_Rank()
-[2025-05-15 08:39:58] --  -- rank(0):send message component validation passed
-[2025-05-15 08:39:58] --  -- rank(0):send message to rank(1)
-[2025-05-15 08:39:58] --  -- rank(0):send message waiting for empty pool semaphore
-[2025-05-15 08:39:58] --  -- rank(0):send message empty pool semaphore unlocked
-[2025-05-15 08:39:58] --  -- rank(0):send message lock buffer in/out mutexes
-[2025-05-15 08:39:58] --  -- rank(0):send message pool not full
-[2025-05-15 08:39:58] --  -- rank(0):send message slot 255 is free
-[2025-05-15 08:39:58] --  -- rank(0):send message data is written
-[2025-05-15 08:39:58] --  -- rank(0): memcpy src=0x7ffe10c86550, dest=0x7fbf5066fc5c, size=1024
-[2025-05-15 08:39:58] --  -- rank(0):send message data is sent
-[2025-05-15 08:39:58] --  -- rank(0):send message trigger pool full signal
-[2025-05-15 08:39:58] --  -- rank(0):send message ends
-[2025-05-15 08:39:58] --  -- -- OSMP_Finalize() called --
-[2025-05-15 08:39:58] --  -- rank(1):recv message pool is full is triggered
-[2025-05-15 08:39:58] --  -- rank(1):send message slot is checked
-[2025-05-15 08:39:58] --  -- rank(1):send message data is read
-[2025-05-15 08:39:58] --  -- rank(1):recv message trigger is empty event
-[2025-05-15 08:39:58] --  -- rank(1):recv message release busy slot
-[2025-05-15 08:39:58] --  -- rank(1):recv message ends
-[2025-05-15 08:39:58] --  -- -- OSMP_Finalize() called --
-[2025-05-15 08:39:58] -- OSMP_LOG_NONE -- all processes are finished
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- SHM initialized successfully
+[2025-06-04 18:51:36] --  -- process synchronization stuff of 0 initialized
+[2025-06-04 18:51:36] --  -- process synchronization stuff of 1 initialized
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
+[2025-06-04 18:51:36] --  -- ========PID IN fill_shm: 29555
+[2025-06-04 18:51:36] --  -- ========PID IN fill_shm: 29556
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
+[2025-06-04 18:51:36] --  -- RANK = 0, pid = 29555, current_pid = 29555
+[2025-06-04 18:51:36] --  -- RANK = 0, pid = 29555, current_pid = 29555
+[2025-06-04 18:51:36] --  -- rank(0):called OSMP_Size()
+[2025-06-04 18:51:36] --  -- RANK = 0, pid = 29555, current_pid = 29556
+[2025-06-04 18:51:36] --  -- called OSMP_Rank()
+[2025-06-04 18:51:36] --  -- called OSMP_Send()
+[2025-06-04 18:51:36] --  -- called OSMP_Rank()
+[2025-06-04 18:51:36] --  -- RANK = 1, pid = 29556, current_pid = 29556
+[2025-06-04 18:51:36] --  -- rank(0):send message component validation passed
+[2025-06-04 18:51:36] --  -- rank(0):send message to rank(1)
+[2025-06-04 18:51:36] --  -- rank(0):send message waiting for empty pool semaphore
+[2025-06-04 18:51:36] --  -- rank(0):send message empty pool semaphore unlocked
+[2025-06-04 18:51:36] --  -- rank(0):send message slot 255 is free
+[2025-06-04 18:51:36] --  -- RANK = 0, pid = 29555, current_pid = 29556
+[2025-06-04 18:51:36] --  -- rank(0):send message data is written
+[2025-06-04 18:51:36] --  -- RANK = 1, pid = 29556, current_pid = 29556
+[2025-06-04 18:51:36] --  -- rank(0): memcpy src=0x55aacad156b0, dest=0x7fdd8423ac5c, size=61
+[2025-06-04 18:51:36] --  -- rank(1):called OSMP_Size()
+[2025-06-04 18:51:36] --  -- rank(0):send message data is sent
+[2025-06-04 18:51:36] --  -- called OSMP_Rank()
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- called OSMP_CreateRequest()
+[2025-06-04 18:51:36] --  -- rank(0):send message lock buffer in/out mutexes
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- called OSMP_IRecv()
+[2025-06-04 18:51:36] --  -- rank(0):send message pool not full
+[2025-06-04 18:51:36] --  -- rank(0):send message trigger pool full signal
+[2025-06-04 18:51:36] --  -- rank(0):send message ends
+[2025-06-04 18:51:36] --  -- -- OSMP_Finalize() called --
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- called OSMP_Wait()
+[2025-06-04 18:51:36] --  -- called OSMP_Recv()
+[2025-06-04 18:51:36] --  -- called OSMP_Rank()
+[2025-06-04 18:51:36] --  -- rank(1):recv message components checked
+[2025-06-04 18:51:36] --  -- rank(1):recv message waiting for pool full event
+[2025-06-04 18:51:36] --  -- rank(1):recv message pool is full is triggered
+[2025-06-04 18:51:36] --  -- rank(1):send message slot is checked
+[2025-06-04 18:51:36] --  -- rank(1):send message data is read
+[2025-06-04 18:51:36] --  -- rank(1):recv message trigger is empty event
+[2025-06-04 18:51:36] --  -- rank(1):recv message release busy slot
+[2025-06-04 18:51:36] --  -- received msg: hello from 0 rank to the 1 rank through Asynchron library ...
+[2025-06-04 18:51:36] --  -- rank(1):recv message ends
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- called OSMP_RemoveRequest()
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- called free on requestStruct
+[2025-06-04 18:51:36] --  -- -- OSMP_Finalize() called --
+[2025-06-04 18:51:36] -- OSMP_LOG_NONE -- all processes are finished

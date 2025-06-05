@@ -1,10 +1,10 @@
 
-#include <stdio.h>
 
 #include "../osmpLibrary/osmpLib.h"
 
 
 int main(int argc, char **argv) {
+    printf("Hello World\n");
     int rv, size, rank, source, len;
     char bufin[1024], bufout[1024];
     rv = OSMP_Init( &argc, &argv );
@@ -28,9 +28,9 @@ int main(int argc, char **argv) {
         bufin[i] = (char) ('A' + i%26);
     }
     bufin[1023] = '\0';
-    if( 0 == rank ) {
+    if( 1 == rank ) {
         // OSMP process 0
-        rv = OSMP_Send( bufin, 1024, OSMP_UNSIGNED_CHAR, 1 );
+        rv = OSMP_Send( bufin, 1024, OSMP_UNSIGNED_CHAR, 0 );
         if (OSMP_FAILURE == rv) {
             return EXIT_FAILURE;
         }
@@ -40,7 +40,13 @@ int main(int argc, char **argv) {
         if (OSMP_FAILURE == rv) {
             return EXIT_FAILURE;
         }
+        if (source != 1)
+        {
+            printf("error: expect 1 found %d\n", source);
+            return -1;
+        }
         printf("OSMP process %d received %d byte from %d\n%s\n",rank, len, source, bufout);
+        printf("test passed ...\n");
     }
     rv = OSMP_Finalize();
     if (OSMP_FAILURE == rv) {
