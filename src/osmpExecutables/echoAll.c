@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include "../osmpLibrary/osmpLib.h"
 
-#define UNUSED(x) (void)(x);
+
 
 int main(int argc, char **argv) {
     int rv; //return value

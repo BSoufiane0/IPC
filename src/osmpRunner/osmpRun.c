@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
                 printf( "---------- rank = %d", shm_manager.shm_ptr->P[i].rank);
                 // log_message_with_timestamp(OSMP_LOG_NONE,"fork child");
 
-                execv("/home/kali/Workspace/BS/team_25/src/osmpExecutables/a.out", args);
+                execv("/home/ms/y/yf151089/CLionProjects/team_25/build/prak4_1", args);
 
                 log_message_with_timestamp(OSMP_LOG_FAILS, "execv failed");
                 exit(EXIT_FAILURE); // exit from the child ...

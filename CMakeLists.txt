@@ -45,6 +45,11 @@ set(LIBRARY_SRC_FILES
     src/osmpLibrary/osmpLib.c
     src/osmpLibrary/osmpLib.h
     src/osmpLibrary/OSMP.h
+    src/util/custom/custom.c
+        src/util/custom/custom.h
+        src/util/wrapper/wrapper.c
+        src/util/wrapper/wrapper.h
+
 )
 add_library(libosmp STATIC ${LIBRARY_SRC_FILES})
 
@@ -68,9 +73,6 @@ set(EXECUTABLES
     SOURCES src/osmpExecutables/osmpExecutables_barrierGatherTest.c
     NAME prak3
     SOURCES src/osmpExecutables/osmpExecutables_SendRecv.c
-        # Neue Executables hier einfügen
-    # NAME <name>
-    # SOURCES <source1> <source2> ...
 )
 
 validate_executables()

@@ -157,3 +157,62 @@
 [2025-06-04 18:51:36] -- OSMP_LOG_NONE -- called free on requestStruct
 [2025-06-04 18:51:36] --  -- -- OSMP_Finalize() called --
 [2025-06-04 18:51:36] -- OSMP_LOG_NONE -- all processes are finished
+[2025-06-05 12:12:11] --  -- ================================
+
+
+
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- SHM initialized successfully
+[2025-06-05 12:12:11] --  -- process synchronization stuff of 0 initialized
+[2025-06-05 12:12:11] --  -- process synchronization stuff of 1 initialized
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- synchronization metadata initialized successfully
+[2025-06-05 12:12:11] --  -- ========PID IN fill_shm: 321045
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- forking process is done < 2 ps is forked successfully>
+[2025-06-05 12:12:11] --  -- ========PID IN fill_shm: 321046
+[2025-06-05 12:12:11] --  -- RANK = 0, pid = 321045, current_pid = 321045
+[2025-06-05 12:12:11] --  -- RANK = 0, pid = 321045, current_pid = 321046
+[2025-06-05 12:12:11] --  -- called OSMP_Rank()
+[2025-06-05 12:12:11] --  -- RANK = 1, pid = 321046, current_pid = 321046
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] --  -- called OSMP_Rank()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called OSMP_Barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- called barrier()
+[2025-06-05 12:12:11] --  -- -- OSMP_Finalize() called --
+[2025-06-05 12:12:11] --  -- -- OSMP_Finalize() called --
+[2025-06-05 12:12:11] -- OSMP_LOG_NONE -- all processes are finished

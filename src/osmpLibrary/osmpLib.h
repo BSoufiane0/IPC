@@ -14,8 +14,8 @@
 #define UNUSED(x) { (void)(x); }
 
 #define SHARED_MEMORY_NAME "/shm_25"
-#define DEFAULT_LOG_FILE "/home/kali/Workspace/BS/team_25/src/logs/osmp.log"
-#define DEFAULT_LOG_FILENAME_SIZE strlen("/home/kali/Workspace/BS/team_25/src/logs/osmp.log")+1
+#define DEFAULT_LOG_FILE "/home/ms/y/yf151089/CLionProjects/team_25/src/logs/osmp.log"
+#define DEFAULT_LOG_FILENAME_SIZE strlen("/home/ms/y/yf151089/CLionProjects/team_25/src/logs/osmp.log")+1
 
 typedef struct {
     int count;
