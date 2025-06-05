@@ -62,6 +62,10 @@ typedef void *OSMP_Request;
  */
 #define OSMP_MAX_PAYLOAD_LENGTH 1024
 
+
+
+typedef enum  { OSMP_READY, OSMP_RUNNING, OSMP_FAIL, OSMP_FINISHED, OSMP_NONE} OOSTATE;
+
 /**
  * Die OSMP-Datentypen entsprechen den C-Datentypen.
  * Sie werden verwendet, um den Typ der Daten anzugeben, die mit den

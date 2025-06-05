@@ -13,6 +13,27 @@
 
 int init_metadata(SharedMemory* ptr, int prozessAnzahl)
 {
+    ptr->barrier.count = prozessAnzahl;
+    ptr->barrier.cycle = 0;
+    ptr->barrier.valid = 1;
+
+    ptr->barriergather.count = prozessAnzahl;
+    ptr->barriergather.cycle = 0;
+    pthread_condattr_t condition_attr;
+    if (pthread_condattr_setpshared(&condition_attr, PTHREAD_PROCESS_SHARED) != 0)
+    {
+        printf("mutexattr set failed\n");
+        return OSMP_FAILURE;
+    }
+    if(pthread_cond_init(&ptr->barrier.condition, &condition_attr) != 0){
+        printf("Cond_init_barrier.condition Error\n");
+        return OSMP_FAILURE;
+    } // Initialize condition variable for fct Barrier
+    if(pthread_cond_init(&ptr->barriergather.condition, &condition_attr) != 0){
+        printf("Cond_init_barriergather.condition Error\n");
+        return OSMP_FAILURE;
+    }// Initialize condition variable for fct BarrierGather
+
     pthread_mutexattr_t mutexattr;
 
     if (pthread_mutexattr_init(&mutexattr) != 0)
@@ -26,7 +47,6 @@ int init_metadata(SharedMemory* ptr, int prozessAnzahl)
         printf("mutexattr set failed\n");
         return OSMP_FAILURE;
     }
-
     if (pthread_mutex_init(&shm_manager.shm_ptr->mutex, &mutexattr) != 0)
     {
         printf("mutex init failed\n");
@@ -46,22 +66,31 @@ int init_metadata(SharedMemory* ptr, int prozessAnzahl)
             printf("Mutex_init P[i].mutex_proc_in Error\n");
             return OSMP_FAILURE;
         }// Initialize mutex for fct proc in
+
         if(pthread_mutex_init(&ptr->P[i].out_mutex, &mutexattr)!=0){
             printf("Mutex_init P[i].mutex_proc_out Error\n");
             return OSMP_FAILURE;
         }// Initialize mutex for fct proc out
+
         if(pthread_mutex_init(&ptr->P[i].mutex_buffer_len, &mutexattr)!=0){
             printf("Mutex_init P[i].mutex_gather_slot Error\n");
             return OSMP_FAILURE;
         }// Initialize mutex for slot
-        if(sem_init(&ptr->P[i].is_pool_full, 1, 0)!=0){
-            printf("sem_init P[i].sem_proc_full Error\n");
-            return OSMP_FAILURE;
-        } // Initialize semaphore proc_full with initial value 0
-        if(sem_init(&ptr->P[i].is_pool_empty, 1, OSMP_MAX_MESSAGES_PROC)!=0){
+
+        if(sem_init(&ptr->P[i].sem_proc_empty, 1, OSMP_MAX_MESSAGES_PROC)!=0){
             printf("sem_init P[i].sem_proc_empty Error\n");
             return OSMP_FAILURE;
         } // Initialize semaphore proc-empty with initial value OSMP_MAX_MESSAGES_PROC
+
+        if(sem_init(&ptr->P[i].sem_proc_full, 1, 0)!=0){
+            printf("sem_init P[i].sem_proc_full Error\n");
+            return OSMP_FAILURE;
+        } // Initialize semaphore proc_full with initial value 0
+
+        if(pthread_mutex_init(&ptr->P[i].mutex_gather_slot, &mutexattr)!=0){
+            printf("Mutex_init P[i].mutex_gather_slot Error\n");
+            return OSMP_FAILURE;
+        }// Initialize mutex for slot
     }
 
     //  puts("proc mutex fertig");//added to debbug
@@ -77,7 +106,7 @@ int init_metadata(SharedMemory* ptr, int prozessAnzahl)
     } // Initialize semaphore freelist with initial value OSMP_MAX_SLOTS
 
 
-    if(pthread_mutexattr_destroy(&mutexattr)!=0){
+    if(pthread_mutexattr_destroy(&mutexattr) != 0){
         printf("destroy barrier.barrier_Mutex Error\n");
         return OSMP_FAILURE;
     }
@@ -98,7 +127,26 @@ int cleanup_resources(SharedMemory *ptr, int prozessAnzahl) {
     }
 
     // TODO: destroy barriers ..
+    ptr->barrier.valid = 0;
+    if(pthread_cond_destroy(&ptr->barrier.condition)!=0){
+        printf("destroy barrier.condition Error\n");
+        return OSMP_FAILURE;
+    }
+    ptr->barriergather.valid = 0;
+    if(pthread_cond_destroy(&ptr->barriergather.condition)!=0){
+        printf("destroy barriergather.condition Error\n");
+        return OSMP_FAILURE;
+    }
 
+    // Destroy mutexes
+    if(pthread_mutex_destroy(&ptr->barrier.barrier_Mutex)!=0){
+        printf("destroy barrier.barrier_Mutex Error\n");
+        return OSMP_FAILURE;
+    }
+    if(pthread_mutex_destroy(&ptr->barriergather.barrier_Mutex)!=0){
+        printf("destroy barriergather.barrier_Mutex Error\n");
+        return OSMP_FAILURE;
+    }
     // Destroy free list
     if(pthread_mutex_destroy(&ptr->freelst.mutex_count) != 0){
         printf("destroy freelst.mutex_count Error\n");
@@ -124,11 +172,11 @@ int cleanup_resources(SharedMemory *ptr, int prozessAnzahl) {
             printf("destroy P[i].mutex_gather_slot Error\n");
             return OSMP_FAILURE;
         }
-        if(sem_destroy(&ptr->P[i].is_pool_empty)!=0){
+        if(sem_destroy(&ptr->P[i].sem_proc_empty)!=0){
             printf("destroy P[i].sem_proc_full Error\n");
             return OSMP_FAILURE;
         }
-        if(sem_destroy(&ptr->P[i].is_pool_full)!=0){
+        if(sem_destroy(&ptr->P[i].sem_proc_full)!=0){
             printf("destroy P[i].sem_proc_empty Error\n");
             return OSMP_FAILURE;
         }
@@ -156,6 +204,8 @@ int fill_shm(int i)
     shm_manager.shm_ptr->P[i].proc_in = 0;
     shm_manager.shm_ptr->P[i].buffer_len = 0;
     shm_manager.shm_ptr->P[i].rank = i;
+
+    log_message_with_timestamp(OSMP_LOG_INFO, "========PID IN fill_shm: %d", shm_manager.shm_ptr->P[i].pid);
     return OSMP_SUCCESS;
 }
 
@@ -174,13 +224,7 @@ int main(int argc, char *argv[]) {
 
 
     char **args =  prepare_argv(argc, argv);
-    // for (int i = 0; i < argc; i++)
-    // {
-    //     args[i] =(char*) malloc((strlen(argv[i]) * sizeof(char)) + 1);
-    //     snprintf(args[i], strlen(argv[i])+1, "%s", argv[i]);
-    // }
 
-    // args[argc] = NULL;
     printf("Arguments set \n");
 
     {
@@ -206,8 +250,9 @@ int main(int argc, char *argv[]) {
             if (!pid)
             {
                 fill_shm(i);
-
-                log_message_with_timestamp(OSMP_LOG_NONE,"fork child");
+                printf( "========== PID = %d", shm_manager.shm_ptr->P[i].pid);
+                printf( "---------- rank = %d", shm_manager.shm_ptr->P[i].rank);
+                // log_message_with_timestamp(OSMP_LOG_NONE,"fork child");
 
                 execv("/home/kali/Workspace/BS/team_25/src/osmpExecutables/a.out", args);
 
@@ -217,7 +262,7 @@ int main(int argc, char *argv[]) {
             else if ( pid < 0) // case of error ...
             {
                 log_message_with_timestamp(OSMP_LOG_FAILS, "fork failed ...");
-                shm_manager.shm_ptr->P[i].pid = -1; // indicate that the rank i contains no ps to kill  ...
+                shm_manager.shm_ptr->P[i].pid = (pid_t)-1; // indicate that the rank i contains no ps to kill  ...
                 continue;
             }
             forked_ps_indicator++;
@@ -229,8 +274,8 @@ int main(int argc, char *argv[]) {
     { // wait for the processes to finish ...
         if (forked_ps_indicator != shm_manager.process_child_number)
             for (int i = 0 ; i < shm_manager.process_child_number ; i++)
-                if (shm_manager.shm_ptr->P[i].pid != -1)
-                    kill(shm_manager.shm_ptr->P[i].pid, SIGKILL);
+                if (shm_manager.shm_ptr->P[i].pid != (pid_t)-1)
+                    kill((pid_t)shm_manager.shm_ptr->P[i].pid, SIGKILL);
 
         for (int i = 0 ; i < shm_manager.process_child_number ; i++)
         {
@@ -262,7 +307,6 @@ int main(int argc, char *argv[]) {
     delete_shm();
     return OSMP_SUCCESS;
 }
-
 
 
 
