@@ -168,6 +168,7 @@ int OSMP_Init(const int *argc, char ***argv);
  */
 int OSMP_Size(int *size);
 
+
 /**
  * Die Funktion OSMP_Rank() liefert in *rank die OSMP-Prozessnummer des
  * aufrufenden OSMP-Prozesses von 0,…,np-1 zurück.
@@ -236,6 +237,15 @@ int OSMP_Finalize(void);
  * @return Im Erfolgsfall OSMP_SUCCESS, sonst OSMP_FAILURE
  */
 int OSMP_Barrier(void);
+
+
+/**
+ * Diese kollektive Funktion blockiert den aufrufenden Prozess für die Gather Funktion.
+ * Erst wenn alle anderen Prozesse ebenfalls an der Barriere angekommen sind, laufen die Prozesse weiter.
+ *
+ * @return Im Erfolgsfall OSMP_SUCCESS, sonst OSMP_FAILURE
+ */
+int OSMP_BarrierGather(void);
 
 /**
  * Diese Funktion ermöglicht die Gather-Kommunikation.

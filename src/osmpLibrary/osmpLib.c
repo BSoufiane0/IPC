@@ -4,59 +4,32 @@
 
 #define _GNU_SOURCE
 
-
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <pthread.h>
+#include <string.h>
+#include <errno.h>
+#include <stdarg.h>
 
 #include "osmpLib.h"
-#include <semaphore.h>
-#include <pthread.h>
-#include <tgmath.h>
-#include <linux/limits.h>
 
-
-RequestNode *requestListHead = NULL;
-pthread_mutex_t requestListMutex = PTHREAD_MUTEX_INITIALIZER;
-
-ShmMemoryManager shm_manager;
 extern pid_t gettid(void);
 
-
-
-int delete_shm()
-{
-    printf("delete_shm | shm size %ld \n", (long)shm_manager.shm_memory_size);
-    if (shm_manager.shm_ptr != NULL && shm_manager.shm_memory_size > 0)
-    {
-        printf("unmap the shm\n");
-        _munmap(shm_manager.shm_ptr, shm_manager.shm_memory_size);
-    }
-    else
-    {
-        printf("shm_ptr is null\n");
-    }
-    printf("unmap the shm\n");
-    _shm_unlink(SHARED_MEMORY_NAME);
-    printf("delete the shm\n");
-    return OSMP_SUCCESS;
-}
-
-int init_shm()
-{
-    shm_manager.shm_memory_size = sizeof(SharedMemory) + sizeof(Prozess) * (size_t)shm_manager.process_child_number;
-
-    int shm_fd = _shm_open(SHARED_MEMORY_NAME, O_RDWR | O_CREAT, 0777);
-    ftruncate(shm_fd, (off_t)shm_manager.shm_memory_size);
-
-    shm_manager.shm_ptr = _mmap(0, shm_manager.shm_memory_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-
-    shm_manager.shm_ptr->anzahlProz = shm_manager.process_child_number;
-    shm_manager.shm_ptr->shmlen = shm_manager.shm_memory_size;
-    shm_manager.shm_ptr->next_ps_entry = 0;
-    shm_manager.shm_ptr->freelst.count = OSMP_MAX_SLOTS-1;
-
-    printf("the free list indicator is initialized\n");
-    close(shm_fd);
-    return OSMP_SUCCESS;
-}
+SharedMemory *shm_ptr=NULL;
+size_t memory_size;
+int rankglobal= -1;
+pid_t pid;
+RequestNode *requestListHead = NULL;
+pthread_mutex_t requestListMutex = PTHREAD_MUTEX_INITIALIZER;
+//logger params
+int loggingVerbosity;
+FILE* pathToLoggingFile;
 
 
 int check_shm_ptr(SharedMemory *ptr) {
@@ -67,85 +40,116 @@ int check_shm_ptr(SharedMemory *ptr) {
     return OSMP_SUCCESS;
 }
 
+// Test sem_wait and sem_post
+int semwait(sem_t *sem) {
+    int semValue = 0;
+    sem_getvalue(sem, &semValue);
+    if (sem_wait(sem) == -1) {
+        if (loggingVerbosity > 1) {
+            pthread_mutex_lock(&shm_ptr->loggingMutex);
+            fprintf(pathToLoggingFile, "Semwait failed @ PID %d || %s\n", pid, OSMP_GetTimeAndDateAsString());
+            pthread_mutex_unlock(&shm_ptr->loggingMutex);
+        }
+        return OSMP_FAILURE;
+    }
+    sem_getvalue(sem, &semValue);
+    return OSMP_SUCCESS;
+}
+int semsignal(sem_t *sem){
+    int semValue = 0;
+    sem_getvalue(sem, &semValue);
+    if (sem_post(sem) == -1) {
+        if (loggingVerbosity > 1) {
+            pthread_mutex_lock(&shm_ptr->loggingMutex);
+            fprintf(pathToLoggingFile, "Semsignal failed @ PID %d || %s\n", pid, OSMP_GetTimeAndDateAsString());
+            pthread_mutex_unlock(&shm_ptr->loggingMutex);
+        }
+        return OSMP_FAILURE;
+    }
+    sem_getvalue(sem, &semValue);
+    return OSMP_SUCCESS;
+}
+void addRequestToList(Request *request) {
+    pthread_mutex_lock(&requestListMutex);
+    RequestNode *newNode = (RequestNode *) malloc(sizeof(RequestNode));
+    if (newNode == NULL) {
+        perror("malloc failed in addRequestToList");
+        pthread_mutex_unlock(&requestListMutex);
+        return;
+    }
+    newNode->request = request;
+    newNode->next = (struct RequestNode *) requestListHead;
+    requestListHead = newNode;
+    pthread_mutex_unlock(&requestListMutex);
+}
 
-int get_OSMP_MAX_PAYLOAD_LENGTH() {
+void removeRequestFromList(Request *request) {
+    pthread_mutex_lock(&requestListMutex);
+    RequestNode *current = requestListHead;
+    RequestNode *preced = NULL;
+    while (current != NULL) {
+        if (current->request == request) {
+            if(preced == NULL)
+                requestListHead = (RequestNode *) current->next;
+            else
+                preced->next = current->next;
+            free(current);
+            break;
+        }
+        current = (RequestNode *) current->next;
+    }
+    pthread_mutex_unlock(&requestListMutex);
+}
+
+void cleanupRequestList() {
+    pthread_mutex_lock(&requestListMutex);
+    RequestNode *current = requestListHead;
+    while (current != NULL) {
+        RequestNode *toDelete = current;
+        current = (RequestNode *) current->next;
+        if(toDelete->request->status_flag == OSMP_RUNNING)
+        {
+            pthread_cancel(toDelete->request->thread);
+        }
+        // Destroy the semaphore and mutex associated with the request
+        if (sem_destroy(&toDelete->request->quit) != 0) {
+            perror("Failure in sem_destroy: requestStruct->quit");
+        }
+        if (pthread_mutex_destroy(&toDelete->request->request_mutex) != 0) {
+            perror("Failure in pthread_mutex_destroy: requestStruct->request_mutex");
+        }
+        // Free the request structure
+        free(toDelete->request);
+        // Free the list node
+        free(toDelete);
+    }
+    requestListHead = NULL;
+    pthread_mutex_unlock(&requestListMutex);
+}
+
+int OSMP_GetMaxPayloadLength() {
     //printf("get_OSMP_MAX_PAYLOAD_LENGTH() gibt den Wert für OSMP_MAX_PAYLOAD_LENGTH zurück\n");
     return OSMP_MAX_PAYLOAD_LENGTH;
 }
 
-int get_OSMP_MAX_SLOTS() {
+int OSMP_GetMaxSlots() {
     //printf("get_OSMP_MAX_SLOTS() gibt den Wert für OSMP_MAX_SLOTS zurück\n");
     return OSMP_MAX_SLOTS;
 }
 
-int get_OSMP_MAX_MESSAGES_PROC() {
+int OSMP_GetMaxMessagesProc() {
     //printf("get_OSMP_MAX_MESSAGES_PROC() gibt den Wert für OSMP_MAX_MESSAGES_PROC zurück\n");
     return OSMP_MAX_MESSAGES_PROC;
 }
 
-int get_OSMP_FAILURE() {
+int OSMP_GetFailure() {
     //printf("get_OSMP_FAILURE() gibt den Wert für OSMP_FAILURE zurück\n");
     return OSMP_FAILURE;
 }
 
-int get_OSMP_SUCCESS() {
+int OSMP_GetSuccess() {
     //printf("get_OSMP_SUCCESS() gibt den Wert für OSMP_SUCCESS zurück\n");
     return OSMP_SUCCESS;
-}
-
-/**
- *
- * @param argc parameters length
- * @param argv parameters array
- * @return stores the verbosity and the logging fd at the ShmMemoryManager ...
- */
-int getenv_param(const int *argc, char ***argv)
-{
-    char* logging_file = (char*) malloc(sizeof(char) * PATH_MAX);
-    int verbosity = -1;
-    int logging = 0;
-    for (int i = 1; i < *argc; i++)
-    {
-        char* tmp = (*argv)[i];
-        if (strncmp(tmp, "-v", strlen("-v")) == 0)
-        {
-            char* cverbosity = (*argv)[i+1];
-            verbosity = atoi(cverbosity);
-            i++;
-        }
-        else if (strncmp(tmp, "-l", strlen("-l")) == 0)
-        {
-            logging = 1;
-            strncpy(logging_file, (*argv)[i+1], strlen((*argv)[i+1])+1);
-            i++;
-        }
-        else
-            shm_manager.process_child_number = atoi(tmp);
-
-    }
-
-    shm_manager.loggingVerbosity = verbosity == -1 ? OSMP_LOG_NONE : verbosity;
-
-    // open file descriptor or create the file if it does not exists ...
-    if (!logging )
-        strncpy(logging_file , DEFAULT_LOG_FILE, DEFAULT_LOG_FILENAME_SIZE);
-
-    shm_manager.log_file = logging_file;;
-    logging_file = NULL;
-    return OSMP_SUCCESS;
-
-}
-
-pid_t get_current_rank()
-{
-    pid_t current_ps = _getpid();
-    for (int i = 0; i < shm_manager.process_child_number; i++)
-    {
-        log_message_with_timestamp(OSMP_LOG_INFO, "RANK = %d, pid = %d, current_pid = %d", i, shm_manager.shm_ptr->P[i].pid, current_ps);
-        if (current_ps == shm_manager.shm_ptr->P[i].pid)
-            return i;
-    }
-    return -1;
 }
 
 /**
@@ -158,42 +162,65 @@ pid_t get_current_rank()
 int OSMP_Init(const int *argc, char ***argv) {
     UNUSED(argc);
     UNUSED(argv);
-    /**
-     * we expect all direct fields at the SharedMemory object to be initialized at the runner ...
-     * TODO: you need to call mutex to synchronize the access to the resource ...
-     */
+    pid = getpid();
+    pid_t tid = gettid();
 
-    if (getenv_param(argc, argv) == OSMP_FAILURE)
+    if (pid != tid) {
+        perror("Failed new thread");
         return OSMP_FAILURE;
-
-    int memory_fd = _shm_open(SHARED_MEMORY_NAME, O_RDWR, 0777);
-
-    struct stat shm_stat ;
-    if (fstat(memory_fd, &shm_stat) < 0)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Init) fstat failed ...\n");
+    }
+    int shm_fd = shm_open(shmName, O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+        perror("Failed to shm_open\n");
         return OSMP_FAILURE;
     }
 
-    shm_manager.shm_memory_size = (size_t)shm_stat.st_size;
+    struct stat statShm;
+    if (fstat(shm_fd, &statShm) == -1) {
+        perror("fstat() Fehler");
+        return OSMP_FAILURE;
+    }
+    memory_size = (size_t)statShm.st_size;
 
-    shm_manager.shm_ptr = (SharedMemory*) _mmap(0, shm_manager.shm_memory_size , PROT_READ | PROT_WRITE, MAP_SHARED, memory_fd, 0);
-
-    if((shm_manager.current_ps_rank = get_current_rank()) < 0)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Init) current_ps_rank is not set ...\n");
+    shm_ptr = mmap(NULL, memory_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_fd, 0);
+    if (shm_ptr == MAP_FAILED) {
+        perror("Failed to mmap");
         return OSMP_FAILURE;
     }
 
-
-    {// fill the process structure fields ...
-        shm_manager.shm_ptr->P[shm_manager.current_ps_rank].pid = shm_manager.pid = getpid();
-        shm_manager.shm_ptr->P[shm_manager.current_ps_rank].proc_in = 0;
-        shm_manager.shm_ptr->P[shm_manager.current_ps_rank].proc_out = 0;
-        shm_manager.shm_ptr->P[shm_manager.current_ps_rank].rank = shm_manager.current_ps_rank;
+    rankglobal = -1;
+    for (int i = 0; i < shm_ptr->anzahlProz; ++i) {
+        if (shm_ptr->P[i].pid == pid) {
+            rankglobal = shm_ptr->P[i].rank;
+            break;
+        }
     }
 
-    close(memory_fd);
+    if (rankglobal == -1) {
+        fprintf(stderr, "Process with PID %d could not find its rank.\n", (int)pid);
+        return OSMP_FAILURE;
+    }
+
+    // Logger part
+    int loggingSet = atoi((*argv)[0]);// Convert logging set argument to integer
+    if (loggingSet == 0) {// Check if logging set to 0
+        loggingVerbosity = 0;  // Set logging verbosity to 0
+    } else if (loggingSet == 1) {// if logging set to  1
+        char *loggingFileName = (*argv)[1];// Get logging file name from arguments
+        pathToLoggingFile = fopen(loggingFileName, "a+");// Open logging file in append mode
+        loggingVerbosity = atoi((*argv)[2]);
+
+        if (pathToLoggingFile == NULL) { // Check if logging file couldn't be opened
+            printf("Logging file couldn't be opened\n");
+            printf("Errno: %s\n", strerror(errno));
+            return OSMP_FAILURE;
+        }
+    } else {
+        printf("Wrong logging activity set @ PID %d\n", pid);
+        return OSMP_FAILURE;
+    }
+
+    log_message_with_timestamp("called OSMP_Init()");// Log message indicating initialization
 
     return OSMP_SUCCESS;
 }
@@ -244,14 +271,24 @@ int OSMP_SizeOf(OSMP_Datatype datatype, unsigned int *size) {
  * Initialisierung der Anzahl findet im OSMP-Starter statt.
  */
 int OSMP_Size(int *size) {
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):called OSMP_Size()", get_current_rank());
-    if (shm_manager.shm_ptr == NULL)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Size) try to access or trait a non-existed shared Memory ...\n");
+
+    log_message_with_timestamp("called OSMP_Size()");
+
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
-    *size = shm_manager.shm_ptr->anzahlProz;
+    if (size == NULL) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("size is NULL @ PID %d ||", pid);
+        }
+        return OSMP_FAILURE;
+    }
+
+    *size = shm_ptr->anzahlProz;
     return OSMP_SUCCESS;
 }
 
@@ -261,390 +298,250 @@ int OSMP_Size(int *size) {
  * Initialisierung des Ranges findet im OSMP-Starter statt.
  */
 int OSMP_Rank(int *rank) {
-    log_message_with_timestamp(OSMP_LOG_INFO, "called OSMP_Rank()");
+    log_message_with_timestamp("called OSMP_Rank()");
 
-    if (shm_manager.shm_ptr == NULL)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Rank) try to access or trait a non-existed shared Memory ...\n");
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
-    if (shm_manager.current_ps_rank == -1)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Rank) shared Memory initialized, but the rank is not  ...\n");
+    if (rank == NULL) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("rank is NULL @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
-    if (shm_manager.pid != getpid())
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Rank) current pid and the shared memeory pid are not identical  ...\n");
+    // Verify the current process's rank
+    // if (shm_ptr->P[rankglobal].pid != gettid())
+    if (shm_ptr->P[rankglobal].pid != getpid()) {
         return OSMP_FAILURE;
     }
 
-    *rank = shm_manager.current_ps_rank;
+    *rank = rankglobal;
     return OSMP_SUCCESS;
 }
 
+// Helper function to find a free message slot für osmpSend
+int get_free_slot() {
+    int free_slot = -1;
+// Wait for a free message slot
+    semwait(&(shm_ptr->freelst.messageEmpty));
 
-
-int clean_msg_slot(MessageSlot* msg_slot)
-{
-    msg_slot->source = -1;
-    memset(msg_slot->message, 0, sizeof(msg_slot->message));
-    msg_slot->count = 0;
-    msg_slot->datatype = OSMP_BYTE;
-    return OSMP_SUCCESS;
-}
-
-int semwait(sem_t *sem) {
-    int semValue = 0;
-    sem_getvalue(sem, &semValue);
-    if (sem_wait(sem) == -1) {
-        FILE* file = fopen(shm_manager.log_file, "a");
-        pthread_mutex_lock(&shm_manager.shm_ptr->log_mutex);
-        fprintf(file, "Semwait failed @ PID %d || %s\n", shm_manager.pid, OSMP_GetTimeAndDateAsString());
-        fclose(file);
-        pthread_mutex_unlock(&shm_manager.shm_ptr->log_mutex);
-
-        return OSMP_FAILURE;
+// Lock the mutex to protect the freelst count
+    pthread_mutex_lock(&(shm_ptr->freelst.mutex_count));
+    if (shm_ptr->freelst.count > 0) {
+        free_slot = shm_ptr->freelst.freelst[--(shm_ptr->freelst.count)];
     }
-    sem_getvalue(sem, &semValue);
-    return OSMP_SUCCESS;
-}
+    pthread_mutex_unlock(&(shm_ptr->freelst.mutex_count));
 
-int semsignal(sem_t *sem){
-    int semValue = 0;
-    sem_getvalue(sem, &semValue);
-    if (sem_post(sem) == -1) {
-        FILE* file = fopen(shm_manager.log_file, "a");
-        pthread_mutex_lock(&shm_manager.shm_ptr->log_mutex);
-        fprintf(file, "Semsignal failed @ PID %d || %s\n", shm_manager.pid, OSMP_GetTimeAndDateAsString());
-        fclose(file);
-        pthread_mutex_unlock(&shm_manager.shm_ptr->log_mutex);
-        return OSMP_FAILURE;
-    }
-    sem_getvalue(sem, &semValue);
-    return OSMP_SUCCESS;
-}
-
-int get_free_slot()
-{
-    int free = -1;
-    semwait(&(shm_manager.shm_ptr->freelst.messageEmpty));
-    pthread_mutex_lock(&(shm_manager.shm_ptr->freelst.mutex_count));
-    free = shm_manager.shm_ptr->freelst.freelst[shm_manager.shm_ptr->freelst.count--];
-    pthread_mutex_unlock(&(shm_manager.shm_ptr->freelst.mutex_count));
-    return free;
+    return free_slot;
 }
 
 int OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest) {
-    log_message_with_timestamp(OSMP_LOG_INFO, "called OSMP_Send()");
+    log_message_with_timestamp("called OSMP_Send()");
 
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "No shared memory area accessible @ PID %d ||", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     if (buf == NULL) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Buffer is empty @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Buffer is empty @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
+    unsigned int dataSize;
+    OSMP_SizeOf(datatype, &dataSize);
     if (count <= 0) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Message count is 0 @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Message is 0 @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     int rank;
     if (OSMP_Rank(&rank) == OSMP_FAILURE) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Error getting rank @ PID %d ||", shm_manager.pid);
-        return OSMP_FAILURE;
-    }
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message component validation passed", rank);
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message to rank(%d)", rank, dest);
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message waiting for empty pool semaphore", rank);
-    semwait(&(shm_manager.shm_ptr->P[dest].sem_proc_empty));
-
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message empty pool semaphore unlocked", rank);
-
-
-
-    int free_slot = (int)get_free_slot();
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message slot %d is free", rank, free_slot);
-
-    if (free_slot < 0)
-    {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Error: Process %d cannot send message to process %d @ PID %d, all slots are busy ||", rank, dest, shm_manager.pid);
-        pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].in_mutex));
-        pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].out_mutex));
-        return OSMP_FAILURE;
-    }
-
-    shm_manager.shm_ptr->msg[(int)free_slot].source = rank;
-    shm_manager.shm_ptr->msg[(int)free_slot].count = count;
-    shm_manager.shm_ptr->msg[(int)free_slot].datatype = datatype;
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message data is written", rank);
-    int copy_len = 0;
-    if (OSMP_SizeOf(datatype,(unsigned int*) &copy_len) == OSMP_FAILURE)
-    {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "<%d> OSMP_Sizeof Error : send message failed ...", rank);
-        pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].in_mutex));
-        pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].mutex_buffer_len));
-        return OSMP_FAILURE;
-    }
-
-    copy_len *= count;
-
-    log_message_with_timestamp(OSMP_LOG_INFO,
-        "rank(%d): memcpy src=%p, dest=%p, size=%d",
-        rank, buf, shm_manager.shm_ptr->msg[free_slot].message,
-        copy_len
-    );
-
-    if (memcpy(shm_manager.shm_ptr->msg[free_slot].message, buf, (size_t)copy_len) == NULL)
-    {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "<%d> Error : %s", rank, strerror(errno));
-        pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].in_mutex));
-        pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].mutex_buffer_len));
-        return OSMP_FAILURE;
-    }
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message data is sent", rank);
-
-    pthread_mutex_lock(&(shm_manager.shm_ptr->P[dest].in_mutex));
-    pthread_mutex_lock(&(shm_manager.shm_ptr->P[dest].mutex_buffer_len));
-        log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message lock buffer in/out mutexes", rank);
-
-        int in_index = shm_manager.shm_ptr->P[dest].proc_in, buffer_len = shm_manager.shm_ptr->P[dest].buffer_len;
-
-        if ( buffer_len >= OSMP_MAX_MESSAGES_PROC) // the sem is indicated that the pool is empty ..
-        {
-            log_message_with_timestamp(OSMP_LOG_FAILS, "Error: Process %d cannot send message to process %d @ PID %d ||", rank, dest, shm_manager.pid);
-            return OSMP_FAILURE;
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Error getting rank @ PID %d ||", pid);
         }
+        return OSMP_FAILURE;
+    }
 
-        log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message pool not full", rank);
+    if (dest < 0 || dest >= shm_ptr->anzahlProz) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Trying to send to a process that's not available @ PID %d ||", pid);
+        }
+        return OSMP_FAILURE;
+    } else if (dest == rank) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Can't send to yourself @ PID %d ||", pid);
+        }
+        return OSMP_FAILURE;
+    }
 
-        shm_manager.shm_ptr->P[dest].PostEingang[in_index] = free_slot; // set the slot in posteingang
-        shm_manager.shm_ptr->P[dest].proc_in = (in_index + 1) % OSMP_MAX_MESSAGES_PROC;
-    shm_manager.shm_ptr->P[dest].buffer_len++;
-    pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].in_mutex));
-    pthread_mutex_unlock(&(shm_manager.shm_ptr->P[dest].mutex_buffer_len));
+    semwait(&(shm_ptr->P[dest].sem_proc_empty));
 
+    int free_slot = get_free_slot();
+    if (free_slot == -1) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No free slot available @ PID %d ||", pid);
+        }
+        return OSMP_FAILURE;
+    }
 
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message trigger pool full signal", rank);
-    semsignal(&(shm_manager.shm_ptr->P[dest].sem_proc_full));
+    shm_ptr->msg[free_slot].source = rank;
+    memcpy(shm_ptr->msg[free_slot].message, buf, (size_t) count * dataSize);
+    shm_ptr->msg[free_slot].count = count;
+    shm_ptr->msg[free_slot].datatype = datatype;
 
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message ends", rank);
+    pthread_mutex_lock(&(shm_ptr->P[dest].mutex_proc_in));
+    shm_ptr->P[dest].PostEingang[shm_ptr->P[dest].proc_in] = (char) free_slot;
+    shm_ptr->P[dest].proc_in = (shm_ptr->P[dest].proc_in + 1) % OSMP_MAX_MESSAGES_PROC;
+    pthread_mutex_unlock(&(shm_ptr->P[dest].mutex_proc_in));
+
+    semsignal(&(shm_ptr->P[dest].sem_proc_full));
 
     return OSMP_SUCCESS;
 }
-
+//hilfsfunction für osmpRecv
 void release_free_slot(int msg_slot) {
-    pthread_mutex_lock(&(shm_manager.shm_ptr->freelst.mutex_count));
-    shm_manager.shm_ptr->freelst.freelst[shm_manager.shm_ptr->freelst.count++] = msg_slot;
-    pthread_mutex_unlock(&(shm_manager.shm_ptr->freelst.mutex_count));
-    semsignal(&(shm_manager.shm_ptr->freelst.messageEmpty));
+    pthread_mutex_lock(&(shm_ptr->freelst.mutex_count));
+    shm_ptr->freelst.freelst[shm_ptr->freelst.count++] = msg_slot;
+    pthread_mutex_unlock(&(shm_ptr->freelst.mutex_count));
+    semsignal(&(shm_ptr->freelst.messageEmpty));
 }
-
 int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *len) {
-    log_message_with_timestamp(OSMP_LOG_INFO, "called OSMP_Recv()");
+    log_message_with_timestamp("called OSMP_Recv()");
 
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "No shared memory area accessible @ PID %d ||", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     if (buf == NULL) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Buffer is empty @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Buffer is empty @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     if (count <= 0) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Message count is 0 @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Message count is 0 @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     int rank;
     if (OSMP_Rank(&rank) == OSMP_FAILURE) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Error getting rank @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Error getting rank @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     if (source == NULL || len == NULL) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Error source is NULL or len is NULL @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Error source is NULL or len is NULL @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):recv message components checked", rank);
 
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):recv message waiting for pool full event", rank);
+    semwait(&(shm_ptr->P[rank].sem_proc_full));
 
-    semwait(&(shm_manager.shm_ptr->P[rank].sem_proc_full));
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):recv message pool is full is triggered", rank);
-
-    pthread_mutex_lock(&(shm_manager.shm_ptr->P[rank].out_mutex));
-    pthread_mutex_lock(&(shm_manager.shm_ptr->P[rank].mutex_buffer_len));
-
-        int msg_slot = (unsigned char) shm_manager.shm_ptr->P[rank].PostEingang[shm_manager.shm_ptr->P[rank].proc_out];
-        shm_manager.shm_ptr->P[rank].proc_out = (shm_manager.shm_ptr->P[rank].proc_out + 1) % OSMP_MAX_MESSAGES_PROC;
-        shm_manager.shm_ptr->P[rank].buffer_len--; // decrease the buffer length
-
-    pthread_mutex_unlock(&(shm_manager.shm_ptr->P[rank].out_mutex));
-    pthread_mutex_unlock(&(shm_manager.shm_ptr->P[rank].mutex_buffer_len));
-
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message slot is checked", rank);
+    pthread_mutex_lock(&(shm_ptr->P[rank].mutex_proc_out));
+    int msg_slot = (unsigned char) shm_ptr->P[rank].PostEingang[shm_ptr->P[rank].proc_out];
+    shm_ptr->P[rank].proc_out = (shm_ptr->P[rank].proc_out + 1) % OSMP_MAX_MESSAGES_PROC;
+    pthread_mutex_unlock(&(shm_ptr->P[rank].mutex_proc_out));
 
     unsigned int dataSize;
     OSMP_SizeOf(datatype, &dataSize);
 
-    *source = shm_manager.shm_ptr->msg[msg_slot].source;
-    *len = shm_manager.shm_ptr->msg[msg_slot].count;
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):send message data is read", rank);
+    *source = shm_ptr->msg[msg_slot].source;
+    *len = shm_ptr->msg[msg_slot].count;
 
     // Check if the message is received from itself
     if (*source == rank) {
-        log_message_with_timestamp(OSMP_LOG_FAILS, "Error: Process %d received message from itself @ PID %d ||", rank, shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Error: Process %d received message from itself @ PID %d ||", rank, pid);
+        }
         release_free_slot(msg_slot);
         return OSMP_FAILURE;
     }
 
-    memcpy(buf, shm_manager.shm_ptr->msg[msg_slot].message, (size_t)(*len) * dataSize);
+    memcpy(buf, shm_ptr->msg[msg_slot].message, (size_t)(*len) * dataSize);
 
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):recv message trigger is empty event", rank);
-    semsignal(&(shm_manager.shm_ptr->P[rank].sem_proc_empty));
+    semsignal(&(shm_ptr->P[rank].sem_proc_empty));
 
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):recv message release busy slot", rank);
     release_free_slot(msg_slot);
-    log_message_with_timestamp(OSMP_LOG_INFO, "received msg: %s", (char*)buf);
-    log_message_with_timestamp(OSMP_LOG_INFO, "rank(%d):recv message ends", rank);
 
     return OSMP_SUCCESS;
 }
 
 // Cleans up resources and resets the state of the OSMP library
 int OSMP_Finalize(void) {
-    log_message_with_timestamp(OSMP_LOG_INFO, "-- OSMP_Finalize() called --");
-    if (shm_manager.shm_ptr == NULL)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Finalize) try to access or trait a non-existed shared Memory ...\n");
+    log_message_with_timestamp("called OSMP_Finalize()");
+
+    // Check if shared memory is initialized
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
-    if (shm_manager.current_ps_rank == -1)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Finalize) shared Memory initialized, but the rank is not set ...\n");
+    // Cleanup remaining requests
+    cleanupRequestList();
+
+    // Lock shared memory mutex
+    pthread_mutex_lock(&shm_ptr->mutex_shm);
+
+    // Reset process state
+    shm_ptr->P[rankglobal].pid = -1;
+    shm_ptr->P[rankglobal].proc_in = 0;
+    shm_ptr->P[rankglobal].proc_out = 0;
+    memset(shm_ptr->P[rankglobal].PostEingang, 0, OSMP_MAX_MESSAGES_PROC); // Reset the array values to 0
+
+    // Unlock shared memory mutex
+    pthread_mutex_unlock(&shm_ptr->mutex_shm);
+
+    // Unmap shared memory
+    if (munmap(shm_ptr, memory_size) == -1) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Failure: OSMP_Finalize / munmap() @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
-    { // clean up the shared entry for the current process ...
-        shm_manager.shm_ptr->P[shm_manager.current_ps_rank].pid = -1;
-        shm_manager.shm_ptr->P[shm_manager.current_ps_rank].proc_in = 0;
-        shm_manager.shm_ptr->P[shm_manager.current_ps_rank].proc_out = 0;
-        memset(shm_manager.shm_ptr->P[shm_manager.current_ps_rank].PostEingang, 0, OSMP_MAX_MESSAGES_PROC * sizeof(size_t));
-        // clean_msg_slot(&shm_manager.shm_ptr->P[shm_manager.current_ps_rank].gather_slot);
-    }
-    shm_manager.shm_ptr->next_ps_entry--;
-
-    if (munmap(shm_manager.shm_ptr,shm_manager.shm_memory_size) < 0)
-    {
-        OSMP_Log(OSMP_LOG_FAILS, "(OSMP_Finalize) munmap failed ...\n");
-        return OSMP_FAILURE;
-    }
-    shm_manager.shm_ptr = NULL;
-    free(shm_manager.log_file);
-    return OSMP_SUCCESS;
-}
-
-
-char* OSMP_GetTimeAndDateAsString() {
-    time_t rawtime;  // Variable to hold raw time
-    struct tm *timeinfo;  // Structure to hold time components
-    char *buffer = (char*)malloc(30); // Allocate memory for the buffer to hold time string
-
-    if (buffer == NULL) {
-        perror("Failed to allocate memory");
-        return NULL;
-    }
-
-    time(&rawtime);// Get current time in seconds since epoch
-    timeinfo = localtime(&rawtime);// Convert raw time to local time representation
-
-    if (strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", timeinfo) == 0) {
-        perror("strftime failed");
-        free(buffer);
-        return NULL;
-    }
-
-    return buffer;
-}
-
-char* verbosity_to_string(OSMP_Verbosity verbosity)
-{
-    switch (verbosity)
-    {
-        case OSMP_LOG_NONE:
-            return "OSMP_LOG_NONE";
-        case OSMP_LOG_FAILS:
-            return "OSMP_LOG_FAILS";
-        case OSMP_LOG_MEM:
-            return "OSMP_LOG_MEM";
-        case OSMP_LOG_BIB_CALL:
-            return "OSMP_LOG_BIB_CALL";
-    default:
-        return "";
-    }
-
-}
-
-int OSMP_Log(OSMP_Verbosity verbosity, char *message)
-{
-    if (verbosity < shm_manager.loggingVerbosity) return OSMP_SUCCESS;
-
-    char* time = OSMP_GetTimeAndDateAsString();
-    if (time == NULL) return OSMP_FAILURE;
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "[%s] -- %s -- %s\n", time, verbosity_to_string(verbosity), message);
-    free(time);
-    int logfd = _open(shm_manager.log_file, O_WRONLY | O_APPEND | O_CREAT, 0644);
-
-    pthread_mutex_lock(&shm_manager.shm_ptr->log_mutex);
-    write(logfd, msg, strlen(msg));
-    close(logfd);
-    pthread_mutex_unlock(&shm_manager.shm_ptr->log_mutex);
+    // Reset shared memory pointer
+    shm_ptr = NULL;
 
     return OSMP_SUCCESS;
-}
-
-void log_message_with_timestamp(OSMP_Verbosity verb, const char *fmt, ...)
-{
-    va_list va_args;
-    va_start(va_args, fmt);
-    char buff[4096];
-    bzero(buff, sizeof(buff));
-    vsnprintf(buff, sizeof(buff), fmt, va_args);
-    OSMP_Log(verb, buff);
-    va_end(va_args);
 }
 
 // Function helper of barrier
-void barrier_reset(barrier_t *barrier) {
-    barrier->count = shm_manager.shm_ptr->anzahlProz;
+void barrier_reset(Barrier *barrier) {
+    barrier->count = shm_ptr->anzahlProz;
     barrier->cycle = !barrier->cycle; //reset for cycle and make sure I'm in another cycle
-    barrier->valid = 1;
 }
 
-int barrier(barrier_t *barrier) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called barrier()");
+int barrier(Barrier *barrier) {
+    log_message_with_timestamp("called barrier()");
 
     // Check if shared memory is initialized
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-
-            log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d ||", shm_manager.pid);
-
-        return OSMP_FAILURE;
-    }
-
-    if (!barrier->valid) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d ||", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -652,30 +549,37 @@ int barrier(barrier_t *barrier) {
     pid_t tid = gettid();
 
     // Double check if we are at the right process by using the rankglobal
-    if (shm_manager.shm_ptr->P[shm_manager.current_ps_rank].pid != tid) {
-            log_message_with_timestamp(shm_manager.loggingVerbosity, "We are at the right process comparing pid with tid @ PID %d ||", shm_manager.pid);
-
+    if (shm_ptr->P[rankglobal].pid != tid) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("We are at the right process comparing pid with tid @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     status = pthread_mutex_lock(&barrier->barrier_Mutex);
     if (status != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't lock barrier_mutex @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Couldn't lock barrier_mutex @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
     cycle = barrier->cycle;
     if (--barrier->count == 0) {
         barrier_reset(barrier);
-        if (pthread_cond_broadcast(&barrier->condition) != 0)
-            log_message_with_timestamp(shm_manager.loggingVerbosity, "Error broadcasting the barrier @ PID %d ||", shm_manager.pid);
-
+        if (pthread_cond_broadcast(&barrier->condition) != 0) {
+            if (loggingVerbosity > 1) {
+                log_message_with_timestamp("Error broadcasting the barrier @ PID %d ||", pid);
+            }
+        }
     } else {
         pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel);
-        while (cycle == barrier->cycle) {
+        while (cycle == barrier->cycle) { // cycles are not changed -> not the event that we want (spurouse wake up)
             status = pthread_cond_wait(&barrier->condition, &barrier->barrier_Mutex);
             if (status != 0) {
-                log_message_with_timestamp(shm_manager.loggingVerbosity, "Error waiting at the barrier @ PID %d ||", shm_manager.pid);
+                if (loggingVerbosity > 1) {
+                    log_message_with_timestamp("Error waiting at the barrier @ PID %d ||", pid);
+                }
                 break;
             }
         }
@@ -683,67 +587,82 @@ int barrier(barrier_t *barrier) {
     }
 
     if (pthread_mutex_unlock(&barrier->barrier_Mutex) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't unlock barrier_mutex @ PID %d ||", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Couldn't unlock barrier_mutex @ PID %d ||", pid);
+        }
         return OSMP_FAILURE;
     }
 
-    if (status != 0)
+    if (status == 0) {
+        return OSMP_SUCCESS;
+    } else {
         return OSMP_FAILURE;
-
-    return OSMP_SUCCESS;
+    }
 }
 int OSMP_Barrier(void) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity,"called OSMP_Barrier()");
-    return barrier(&shm_manager.shm_ptr->barrier);
+    log_message_with_timestamp("called OSMP_Barrier()");
+    return barrier(&shm_ptr->barrier);
 }
 
 int OSMP_BarrierGather(void) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_BarrierGather()");
-    return barrier(&shm_manager.shm_ptr->barriergather);
+    log_message_with_timestamp("called OSMP_BarrierGather()");
+    return barrier(&shm_ptr->barriergather);
 }
 
 int OSMP_Gather(void *sendbuf, int sendcount, OSMP_Datatype sendtype, void *recvbuf, int recvcount, OSMP_Datatype recvtype, int root) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_Gather()");
+    log_message_with_timestamp("called OSMP_Gather()");
 
     // Check if shared memory exists
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if(loggingVerbosity>1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Use the global rank
-    int rank = shm_manager.current_ps_rank;
+    int rank = rankglobal;
 
     // Get the number of processes from shared memory
-    int size = shm_manager.shm_ptr->anzahlProz;
+    int size = shm_ptr->anzahlProz;
 
     // Check if send buffer is valid
     if (sendbuf == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Send buffer is empty @ PID %d", shm_manager.pid);
+        if(loggingVerbosity>1) {
+            log_message_with_timestamp("Send buffer is empty @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if send count is non-positive
     if (sendcount <= 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Invalid send count @ PID %d", shm_manager.pid);
+        if(loggingVerbosity>1) {
+            log_message_with_timestamp("Invalid send count @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if receive buffer is valid
     if (recvbuf == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Receive buffer is empty @ PID %d", shm_manager.pid);
+        if(loggingVerbosity>1) {
+            log_message_with_timestamp("Receive buffer is empty @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if receive count is non-positive
     if (recvcount <= 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Invalid receive count @ PID %d", shm_manager.pid);
+        if(loggingVerbosity>1){
+            log_message_with_timestamp("Invalid receive count @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if root index is within bounds
     if (root < 0 || root >= size) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Invalid root process index @ PID %d", shm_manager.pid);
+        if(loggingVerbosity>1){
+            log_message_with_timestamp("Invalid root process index @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -754,19 +673,23 @@ int OSMP_Gather(void *sendbuf, int sendcount, OSMP_Datatype sendtype, void *recv
     OSMP_SizeOf(recvtype, &recvSize);
 
     // Lock the gather mutex of the current process
-    if (pthread_mutex_lock(&shm_manager.shm_ptr->P[rank].mutex_gather_slot) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't lock mutex_gather_slot @ PID %d", shm_manager.pid);
+    if (pthread_mutex_lock(&shm_ptr->P[rank].mutex_gather_slot) != 0) {
+        if(loggingVerbosity>1){
+            log_message_with_timestamp("Couldn't lock mutex_gather_slot @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Copy the send buffer to the gather slot of the current process
-    memcpy(shm_manager.shm_ptr->P[rank].gather_slot.message, sendbuf, (size_t) sendcount * sendSize);
-    shm_manager.shm_ptr->P[rank].gather_slot.count = sendcount;
-    shm_manager.shm_ptr->P[rank].gather_slot.datatype = sendtype;
+    memcpy(shm_ptr->P[rank].gather_slot.message, sendbuf, (size_t) sendcount * sendSize);
+    shm_ptr->P[rank].gather_slot.count = sendcount;
+    shm_ptr->P[rank].gather_slot.datatype = sendtype;
 
     // Unlock the gather mutex
-    if (pthread_mutex_unlock(&shm_manager.shm_ptr->P[rank].mutex_gather_slot) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't unlock mutex_gather_slot @ PID %d", shm_manager.pid);
+    if (pthread_mutex_unlock(&shm_ptr->P[rank].mutex_gather_slot) != 0) {
+        if(loggingVerbosity>1){
+            log_message_with_timestamp("Couldn't unlock mutex_gather_slot @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -777,19 +700,23 @@ int OSMP_Gather(void *sendbuf, int sendcount, OSMP_Datatype sendtype, void *recv
     if (rank == root) {
         for (int i = 0; i < size; ++i) {
             // Lock the gather mutex of the process
-            if (pthread_mutex_lock(&shm_manager.shm_ptr->P[i].mutex_gather_slot) != 0) {
-                log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't lock mutex_gather_slot for root @ PID %d", shm_manager.pid);
+            if (pthread_mutex_lock(&shm_ptr->P[i].mutex_gather_slot) != 0) {
+                if(loggingVerbosity>1){
+                    log_message_with_timestamp("Couldn't lock mutex_gather_slot for root @ PID %d", pid);
+                }
                 return OSMP_FAILURE;
             }
 
             // Copy the data from the gather slot to the root buffer
-            memcpy((char *) recvbuf + (size_t) (i * recvcount) * recvSize,
-                   shm_manager.shm_ptr->P[i].gather_slot.message,
-                   (size_t) shm_manager.shm_ptr->P[i].gather_slot.count * sendSize);
+            memcpy((char *) recvbuf + (size_t) (i * recvcount) * recvSize, // NOTE: THIS SIZE COULD BE WRONG ...
+                   shm_ptr->P[i].gather_slot.message,
+                   (size_t) shm_ptr->P[i].gather_slot.count * sendSize);
 
             // Unlock the gather mutex
-            if (pthread_mutex_unlock(&shm_manager.shm_ptr->P[i].mutex_gather_slot) != 0) {
-                log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't unlock mutex_gather_slot for root @ PID %d", shm_manager.pid);
+            if (pthread_mutex_unlock(&shm_ptr->P[i].mutex_gather_slot) != 0) {
+                if(loggingVerbosity>1){
+                    log_message_with_timestamp("Couldn't unlock mutex_gather_slot for root @ PID %d", pid);
+                }
                 return OSMP_FAILURE;
             }
         }
@@ -800,7 +727,6 @@ int OSMP_Gather(void *sendbuf, int sendcount, OSMP_Datatype sendtype, void *recv
 
     return OSMP_SUCCESS;
 }
-
 
 void *pthreadSend(void *arg){
     //Um den Thread zu killen
@@ -844,51 +770,24 @@ void *pthreadRecv(void *arg){
     return NULL;
 }
 
-void addRequestToList(Request *request) {
-    pthread_mutex_lock(&requestListMutex);
-    RequestNode *newNode = (RequestNode *) malloc(sizeof(RequestNode));
-    if (newNode == NULL) {
-        perror("malloc failed in addRequestToList");
-        pthread_mutex_unlock(&requestListMutex);
-        return;
-    }
-    newNode->request = request;
-    newNode->next = (struct RequestNode *) requestListHead;
-    requestListHead = newNode;
-    pthread_mutex_unlock(&requestListMutex);
-}
-
-void removeRequestFromList(Request *request) {
-    pthread_mutex_lock(&requestListMutex);
-    RequestNode *current = requestListHead;
-    RequestNode *preced = NULL;
-    while (current != NULL) {
-        if (current->request == request) {
-            if(preced == NULL)
-                requestListHead = (RequestNode *) current->next;
-            else
-                preced->next = current->next;
-            free(current);
-            break;
-        }
-        current = (RequestNode *) current->next;
-    }
-    pthread_mutex_unlock(&requestListMutex);
-}
-
 int OSMP_ISend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSMP_Request request) {
-
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_ISend()");
+    if (loggingVerbosity > 0) {
+        log_message_with_timestamp("called OSMP_ISend()");
+    }
 
     // Check if shared memory is initialized
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if request is provided
     if (request == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_ISend request from process is NULL @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_ISend request from process is NULL @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -903,13 +802,17 @@ int OSMP_ISend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
 
     // Lock request mutex
     if (pthread_mutex_lock(&requestStruct->request_mutex) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't lock request_mutex in OSMP_ISend @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Couldn't lock request_mutex in OSMP_ISend @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if flag is not OSMP_READY
     if (requestStruct->status_flag != OSMP_READY) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_ISend request is not ready yet @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_ISend request is not ready yet @ PID %d", pid);
+        }
         pthread_mutex_unlock(&requestStruct->request_mutex);
         return OSMP_FAILURE;
     }
@@ -919,7 +822,9 @@ int OSMP_ISend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
 
     // Unlock request mutex
     if (pthread_mutex_unlock(&requestStruct->request_mutex) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't unlock request_mutex in OSMP_ISend @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("Couldn't unlock request_mutex in OSMP_ISend @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -928,25 +833,30 @@ int OSMP_ISend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     if(pthread_create(&requestStruct->thread, &attr, pthreadSend, requestStruct)){
-        printf("OSMP_Irecv pthread_create Fehler im Prozess!\n");
+        printf("OSMP_ISecv pthread_create Fehler im Prozess!\n");
         return OSMP_FAILURE;
     }
     return OSMP_SUCCESS;
 }
 
 int OSMP_IRecv(void *buf, int count, OSMP_Datatype datatype, int *source, int *len, OSMP_Request request) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_IRecv()");
-
+    if (loggingVerbosity > 0) {
+        log_message_with_timestamp("called OSMP_IRecv()");
+    }
 
     // Check if shared memory is initialized
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "loggingVerbosity, No shared memory area accessible @ PID %d", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if request is provided
     if (request == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_Irecv request from process is NULL @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_Irecv request from process is NULL @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -966,7 +876,9 @@ int OSMP_IRecv(void *buf, int count, OSMP_Datatype datatype, int *source, int *l
     // Check if flag is not OSMP_READY
     if (requestStruct->status_flag != OSMP_READY) {
         pthread_mutex_unlock(&requestStruct->request_mutex);
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_Irecv request is not ready yet @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_Irecv request is not ready yet @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -986,23 +898,30 @@ int OSMP_IRecv(void *buf, int count, OSMP_Datatype datatype, int *source, int *l
 }
 
 int OSMP_Test(OSMP_Request request, int *flag) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_Test()");
-
+    if (loggingVerbosity > 0) {
+        log_message_with_timestamp("called OSMP_Test()");
+    }
     // Check if shared memory is initialized
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if request is provided
     if (request == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_Test: request from process is NULL @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_Test: request from process is NULL @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if flag is provided
     if (flag == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_Test: flag is NULL @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_Test: flag is NULL @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -1018,17 +937,23 @@ int OSMP_Test(OSMP_Request request, int *flag) {
 }
 
 int OSMP_Wait(OSMP_Request request) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_Wait()");
+    if (loggingVerbosity > 0) {
+        log_message_with_timestamp("called OSMP_Wait()");
+    }
 
     // Check if shared memory is initialized
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if request is provided
     if (request == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_Wait: request from process is NULL @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_Wait: request from process is NULL @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -1041,18 +966,24 @@ int OSMP_Wait(OSMP_Request request) {
 }
 
 int OSMP_CreateRequest(OSMP_Request *request) {
-    log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_CreateRequest()");
+    if (loggingVerbosity > 0) {
+        log_message_with_timestamp("called OSMP_CreateRequest()");
+    }
 
     // Check if shared memory is initialized
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d", shm_manager.pid);
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Allocate memory for RequestInfo
     Request* requestStruct = (Request*) malloc(sizeof(Request));
     if (requestStruct == NULL) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "Couldn't allocate memory for requestStruct @ PID %d", shm_manager.pid);
+        if (loggingVerbosity > 2) {
+            log_message_with_timestamp("Couldn't allocate memory for requestStruct @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -1060,14 +991,18 @@ int OSMP_CreateRequest(OSMP_Request *request) {
     requestStruct->status_flag = OSMP_READY;
     pthread_mutexattr_t mutex_attr;
     if (pthread_mutexattr_init(&mutex_attr) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "pthread_mutexattr_init error");
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("pthread_mutexattr_init error");
+        }
         perror("pthread_mutexattr_init");
         free(requestStruct);
         return OSMP_FAILURE;
     }
 
     if (pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "pthread_mutexattr_setpshared error");
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("pthread_mutexattr_setpshared error");
+        }
         perror("pthread_mutexattr_setpshared");
         pthread_mutexattr_destroy(&mutex_attr);
         free(requestStruct);
@@ -1075,7 +1010,9 @@ int OSMP_CreateRequest(OSMP_Request *request) {
     }
 
     if (pthread_mutex_init(&requestStruct->request_mutex, &mutex_attr) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "pthread_mutex_init request_mutex error");
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("pthread_mutex_init request_mutex error");
+        }
         perror("pthread_mutex_init");
         pthread_mutexattr_destroy(&mutex_attr);
         free(requestStruct);
@@ -1083,7 +1020,9 @@ int OSMP_CreateRequest(OSMP_Request *request) {
     }
 
     if (pthread_mutexattr_destroy(&mutex_attr) != 0) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "pthread_mutexattr_destroy error");
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("pthread_mutexattr_destroy error");
+        }
         perror("pthread_mutexattr_destroy");
         pthread_mutex_destroy(&requestStruct->request_mutex);
         free(requestStruct);
@@ -1114,22 +1053,23 @@ int OSMP_CreateRequest(OSMP_Request *request) {
 }
 
 int OSMP_RemoveRequest(OSMP_Request *request) {
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "called OSMP_RemoveRequest()");
-
+    if (loggingVerbosity > 0) {
+        log_message_with_timestamp("called OSMP_RemoveRequest()");
+    }
 
     // Check if shared memory is initialized
-    if (check_shm_ptr(shm_manager.shm_ptr) == OSMP_FAILURE) {
-
-            log_message_with_timestamp(shm_manager.loggingVerbosity, "No shared memory area accessible @ PID %d", shm_manager.pid);
-
+    if (check_shm_ptr(shm_ptr) == OSMP_FAILURE) {
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("No shared memory area accessible @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
     // Check if request is NULL
     if (request == NULL || *request == NULL) {
-
-            log_message_with_timestamp(shm_manager.loggingVerbosity, "RemoveRequest: request is NULL @ PID %d", shm_manager.pid);
-
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("RemoveRequest: request is NULL @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
 
@@ -1140,9 +1080,9 @@ int OSMP_RemoveRequest(OSMP_Request *request) {
     pthread_mutex_lock(&requestStruct->request_mutex);
     if (requestStruct->status_flag == OSMP_RUNNING) {
         pthread_mutex_unlock(&requestStruct->request_mutex);
-
-            log_message_with_timestamp(shm_manager.loggingVerbosity, "OSMP_RemoveRequest: Thread is still running @ PID %d", shm_manager.pid);
-
+        if (loggingVerbosity > 1) {
+            log_message_with_timestamp("OSMP_RemoveRequest: Thread is still running @ PID %d", pid);
+        }
         return OSMP_FAILURE;
     }
     pthread_mutex_unlock(&requestStruct->request_mutex);
@@ -1160,10 +1100,62 @@ int OSMP_RemoveRequest(OSMP_Request *request) {
     removeRequestFromList(requestStruct);
     // Free the allocated memory for the Request structure
     free(requestStruct);
-        log_message_with_timestamp(shm_manager.loggingVerbosity, "called free on requestStruct");
-
+    if (loggingVerbosity > 2) {
+        log_message_with_timestamp("called free on requestStruct");
+    }
 
     *request = NULL;  // Set the request pointer to NULL to avoid dangling pointer issues
 
     return OSMP_SUCCESS;
+}
+
+int OSMP_GetSharedMemoryName(char **name) {
+    *name = shmName;
+
+    return OSMP_SUCCESS;
+}
+
+char* OSMP_GetTimeAndDateAsString() {
+    time_t rawtime;  // Variable to hold raw time
+    struct tm *timeinfo;  // Structure to hold time components
+    char *buffer = (char*)malloc(30); // Allocate memory for the buffer to hold time string
+
+    if (buffer == NULL) {
+        perror("Failed to allocate memory");
+        return NULL;
+    }
+
+    time(&rawtime);// Get current time in seconds since epoch
+    timeinfo = localtime(&rawtime);// Convert raw time to local time representation
+
+    if (strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", timeinfo) == 0) {
+        perror("strftime failed");
+        free(buffer);
+        return NULL;
+    }
+
+    return buffer;
+}
+void log_message_with_timestamp(const char *format, ...) {
+    if (loggingVerbosity > 0) {// Check if logging is enabled
+        va_list args;  // Variable argument list
+        va_start(args, format);  // Initialize variable argument list
+
+        char *timeString = OSMP_GetTimeAndDateAsString();
+        if (timeString == NULL) {
+            va_end(args);
+            return;
+        }
+
+        pthread_mutex_lock(&shm_ptr->loggingMutex);
+
+        fprintf(pathToLoggingFile, "PID: %d ", pid);// Print process ID to logging file
+        vfprintf(pathToLoggingFile, format, args);  // Print formatted message to logging file
+        fprintf(pathToLoggingFile, "\t\t%s\n", timeString);  // Print timestamp to logging file
+
+        pthread_mutex_unlock(&shm_ptr->loggingMutex);
+
+        free(timeString);
+        va_end(args);
+    }
 }

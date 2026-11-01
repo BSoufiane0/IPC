@@ -44,11 +44,14 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic -Wall -Werror -Wextra -Wconversion
 set(LIBRARY_SRC_FILES
     src/osmpLibrary/osmpLib.c
     src/osmpLibrary/osmpLib.h
+
     src/osmpLibrary/OSMP.h
+
     src/util/custom/custom.c
-        src/util/custom/custom.h
-        src/util/wrapper/wrapper.c
-        src/util/wrapper/wrapper.h
+    src/util/custom/custom.h
+
+    src/util/wrapper/wrapper.c
+    src/util/wrapper/wrapper.h
 
 )
 add_library(libosmp STATIC ${LIBRARY_SRC_FILES})
@@ -61,19 +64,53 @@ set(LIBRARIES
 
 #== Executables ==#
 set(EXECUTABLES
-    NAME osmprun
+    NAME osmp_run
     SOURCES src/osmpRunner/osmpRun.c
-    NAME echoall
-    SOURCES src/osmpExecutables/echoAll.c
-    NAME prak5
-    SOURCES src/osmpExecutables/osmpExecutables_5.c
-    NAME prak4_1
-    SOURCES src/osmpExecutables/osmpExecutables_barriers_test2.c
-    NAME prak4_2
-    SOURCES src/osmpExecutables/osmpExecutables_barrierGatherTest.c
-    NAME prak3
-    SOURCES src/osmpExecutables/osmpExecutables_SendRecv.c
+        NAME osmpExecutable_ThreadTest
+        SOURCES src/osmpExecutables/osmpExecutable_ThreadTest.c
+        NAME osmpExecutable_DataExchange
+        SOURCES src/osmpExecutables/osmpExecutable_DataExchange.c
+        NAME osmpExecutable_GatherTestDummy
+        SOURCES src/osmpExecutables/osmpExecutable_GatherTestDummy.c
+        NAME osmpExecutable_WrongTypeTest
+        SOURCES src/osmpExecutables/osmpExecutable_WrongTypeTest.c
+        NAME osmpExecutable_MessageTooBigTest
+        SOURCES src/osmpExecutables/osmpExecutable_MessageTooBigTest.c
+        NAME osmpExecutable_ISendIRecv
+        SOURCES src/osmpExecutables/osmpExecutable_ISendIRecv.c
+        NAME osmpExecutable_BlockFct1
+        SOURCES src/osmpExecutables/osmpExecutable_BlockFct1.c
+        NAME osmpExecutable_SendRecvTest2
+        SOURCES src/osmpExecutables/osmpExecutable_SendRecvTest2.c
+        NAME osmpExecutable_GetFunctions
+        SOURCES src/osmpExecutables/osmpExecutable_GetFunctions.c
+        NAME osmpExecutable_GatherTest
+        SOURCES src/osmpExecutables/osmpExecutable_GatherTest.c
+        NAME osmpExecutable_BarrierTest1
+        SOURCES src/osmpExecutables/osmpExecutable_BarrierTest1.c
+        NAME osmpExecutable_ISendRecv
+        SOURCES src/osmpExecutables/osmpExecutable_ISendRecv.c
+        NAME osmpExecutable_SendIRecv
+        SOURCES src/osmpExecutables/osmpExecutable_SendIRecv.c
+        NAME osmpExecutable_SendRecvTest1
+        SOURCES src/osmpExecutables/osmpExecutable_SendRecvTest1.c
+        NAME osmpExecutable_InitTest1
+        SOURCES src/osmpExecutables/osmpExecutable_InitTest1.c
+        NAME osmpExecutable_SendRecv
+        SOURCES src/osmpExecutables/osmpExecutable_SendRecv.c
+        NAME osmpExecutable_PostBoxLimitTest
+        SOURCES src/osmpExecutables/osmpExecutable_PostBoxLimitTest.c
+        NAME osmpExecutable_BarrierTest2
+        SOURCES src/osmpExecutables/osmpExecutable_BarrierTest2.c
+        NAME osmpExecutable_BarrierGatherTest
+        SOURCES src/osmpExecutables/osmpExecutable_BarrierGatherTest.c
+        NAME osmpExecutable_echoall
+        SOURCES src/osmpExecutables/echoall.c
+
+
 )
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 
 validate_executables()
 create_executables()

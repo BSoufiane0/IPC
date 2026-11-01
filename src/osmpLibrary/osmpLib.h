@@ -4,27 +4,25 @@
 #define _GNU_SOURCE
 
 #include <semaphore.h>
-#include <pthread.h>
 #include "OSMP.h"
 
+// Name of the shared memory
+#define shmName "/shm_36"
 
 /**
  * Macro used to convince the compiler that a variable is being used.
  */
 #define UNUSED(x) { (void)(x); }
 
-#define SHARED_MEMORY_NAME "/shm_25"
-#define DEFAULT_LOG_FILE "/home/ms/y/yf151089/CLionProjects/team_25/src/logs/osmp.log"
-#define DEFAULT_LOG_FILENAME_SIZE strlen("/home/ms/y/yf151089/CLionProjects/team_25/src/logs/osmp.log")+1
 
+
+/** Structure of the Barrier */
 typedef struct {
     int count;
     int cycle;
-    int valid;
-    int threshold;
     pthread_mutex_t barrier_Mutex;
     pthread_cond_t condition;
-} barrier_t;
+} Barrier;
 
 /** Structure of a message slot */
 typedef struct {
@@ -35,49 +33,42 @@ typedef struct {
 } MessageSlot;
 
 typedef struct {
-    // index list of free messageslots to use (z.B. Send ).
-    // Help function to find the indexes of the free remaining message slots
-    int freelst[OSMP_MAX_SLOTS];
+    int freelst[OSMP_MAX_SLOTS];// index list of free messageslots to use (z.B. Send ). Help function to find the indexes of the free remaining message slots
     int count; // point at the first empty slot, initialised by count = OSMP_MAX_SLOTS (herunterzählen)
-    pthread_mutex_t mutex_count; // Mutex for the freelist
+    pthread_mutex_t mutex_count;// protects the int count so that we can use it ( use the free slot, which the count points at )
     sem_t messageEmpty; // empty slot
 } Freelist_t;
 
 /* Structure of a process */
 typedef struct {
-    pid_t pid; // Process ID
-    pid_t rank;
-    // Incoming posts for the process 16, it should be used as a ring buffer.
-    // that has two indexes: proc_in and proc_out
-    int PostEingang[OSMP_MAX_MESSAGES_PROC];
+    int pid; // Process ID
+    int rank;
+    // kan char rditu int to test
+    char PostEingang[OSMP_MAX_MESSAGES_PROC]; // Incoming posts for the process 16, it should be used as a ring buffer. that has two indexes: proc_in and proc_out
     int proc_in; // Index of the incoming message
-    pthread_mutex_t in_mutex;
+    pthread_mutex_t mutex_proc_in; // Semaphore for incoming message synchronization
     int proc_out; // Index of the outgoing message
-    pthread_mutex_t out_mutex;
-    int buffer_len; // Length of the buffer
-    pthread_mutex_t mutex_buffer_len; // Mutex for the buffer length
-    sem_t sem_proc_empty;
-    sem_t sem_proc_full;
+    pthread_mutex_t mutex_proc_out; // Semaphore for outgoing message synchronization
+    sem_t sem_proc_full; // Semaphore indicating full incoming message buffer
+    sem_t sem_proc_empty; // Semaphore indicating empty incoming message buffer
     MessageSlot gather_slot; // Gather message for the process
     pthread_mutex_t mutex_gather_slot; // mutex synchronizer
 } Prozess;
 
 /* Structure of the Shared Memory */
-typedef struct { // the fields should be initialized at the runner ...
+typedef struct {
     int anzahlProz; // Number of processes
     size_t shmlen; // length of the shared memory; can be used in other functions to verify that the shm exists
-    // contains metadata of the msg pool, what is free slots, how many are busy ...
-    Freelist_t freelst;
-    int next_ps_entry ; // the next entry in Prozess array
+    pthread_mutex_t loggingMutex; //mutex for logger
+    pthread_mutex_t mutex_shm;// mutex shm
+    Freelist_t freelst;// warteschlange
+    Barrier barrier;//
+    Barrier barriergather;
     MessageSlot msg[OSMP_MAX_SLOTS]; // Array of message slots 256
-    barrier_t barrier;//
-    barrier_t barriergather;
-    pthread_mutex_t mutex; // Mutex for the shared memory
-    pthread_mutex_t log_mutex;
     Prozess P[]; // Array of processes
 } SharedMemory;
 
-
+/* Information about non-blocking operations */
 typedef struct {
     pthread_t thread;// Thread ID
     OOSTATE status_flag; // Status of the request
@@ -91,7 +82,6 @@ typedef struct {
     sem_t quit;// Binary semaphore to end the operation and free the memory
 } Request;
 
-
 /*Dynamic List to mark created requests (OSMP_CreateRequest) and removed requests (OSMP_RemoveRequest)*/
 typedef struct {
     Request *request;
@@ -99,35 +89,25 @@ typedef struct {
 } RequestNode;
 
 
-
-// this manager pack all neccessary shared Memory meta-data ...
-typedef struct
-{
-    SharedMemory* shm_ptr;
-    int current_ps_rank;
-    size_t shm_memory_size;
-    char* log_file;
-    OSMP_Verbosity loggingVerbosity;
-    pid_t pid;
-    int process_child_number;
-}ShmMemoryManager;
-
-extern ShmMemoryManager shm_manager;
-
-/** Structure of the barrier_t */
-
-/* Information about non-blocking operations */
+/*Documentation of the used functions in osmplib.c*/
+/**
+ * @brief Wartet auf ein Semaphor.
+ * Diese Funktion führt einen sem_wait-Aufruf auf dem übergebenen Semaphor durch.
+ * @param sem Zeiger auf das Semaphor.
+ * @return OSMP_SUCCESS bei Erfolg, OSMP_FAILURE bei Fehler.
+ */
+int semwait(sem_t *sem);
 
 
-/*Dynamic List to mark created requests (OSMP_CreateRequest) and removed requests (OSMP_RemoveRequest)*/
+/**
+ * @brief Signalisiert ein Semaphor.
+ * Diese Funktion führt einen sem_post-Aufruf auf dem übergebenen Semaphor durch.
+ * @param sem Zeiger auf das Semaphor.
+ * @return OSMP_SUCCESS bei Erfolg, OSMP_FAILURE bei Fehler.
+ */
+int semsignal(sem_t *sem);
 
 
-
-
-
-int getenv_param(const int *argc, char ***argv);
-int init_shm();
-int delete_shm();
 /**
  * @brief Überprüft, ob der Shared-Memory-Pointer initialisiert ist.
  * Diese Funktion prüft, ob der übergebene Shared-Memory-Pointer nicht NULL ist.
@@ -151,8 +131,51 @@ int get_free_slot();
  * @param msg_slot Der Index des freizugebenden Slots.
  */
 void release_free_slot(int msg_slot);
+/**
+ * @brief Setzt eine Barriere zurück (function helper for osmp_barrier).
+ * Diese Funktion setzt die Barriere zurück, indem der Zähler auf die Anzahl der Prozesse gesetzt
+ * und der Zyklus umgeschaltet wird.
+ * @param barrier Zeiger auf die Barriere-Struktur.
+ */
+void barrier_reset(Barrier *barrier);
 
 
+/**
+ * @brief Implementiert eine Barriere-Synchronisation.
+ * Diese Funktion implementiert eine Barriere-Synchronisation, bei der alle beteiligten Prozesse
+ * warten, bis alle den Synchronisationspunkt erreicht haben.
+ * @param barrier Zeiger auf die Barriere-Struktur.
+ * @return OSMP_SUCCESS bei Erfolg, OSMP_FAILURE bei Fehler.
+ */
+int barrier(Barrier *barrier);
+
+
+/**
+ * @brief Implementiert eine Gather-Barriere-Synchronisation in der OSMP-Umgebung (second function for barrier used in gather).
+ * Diese Funktion ruft die Barriere-Funktion für eine Gather-Synchronisation der Prozesse auf.
+ * @return OSMP_SUCCESS bei Erfolg, OSMP_FAILURE bei Fehler.
+ */
+int OSMP_BarrierGather(void);
+
+
+
+/**
+ * @brief Sendet Nachrichten asynchron mithilfe eines Threads.
+ * Diese Funktion wird in einem separaten Thread ausgeführt und sendet Nachrichten blockierend.
+ * @param arg Zeiger auf die Request-Struktur.
+ * @return NULL
+ */
+void *pthreadSend(void *arg);
+
+
+/**
+ *  Empfängt Nachrichten mithilfe der Funktion OSMP_Recv und aktualisiert das 'Flag' der Anforderungsstruktur
+ *  basierend auf dem Erfolg der Empfangsoperation.
+ *  Nach der Aktualisierung werden die erforderlichen Semaphoren freigegeben .
+ * @param arg
+ * @return
+ */
+void *pthreadRecv(void *arg);
 
 
 /**
@@ -170,9 +193,35 @@ char* OSMP_GetTimeAndDateAsString();
  * @param ... Zusätzliche Argumente, die formatiert und in die Nachricht eingefügt werden sollen.
  *             Diese sollten den Platzhaltern im Format-String entsprechen.
  */
-void log_message_with_timestamp(OSMP_Verbosity ,const char *format, ...);
+void log_message_with_timestamp(const char *format, ...);
 
 
+/**
+ * @brief Fügt eine nicht blockierende Anfrage zur verketteten Liste hinzu.
+ * Diese Funktion fügt eine neue Anfrage zur verketteten Liste der Anfragen hinzu.
+ * Die Liste wird verwendet, um alle laufenden Anfragen zu verfolgen, damit sie
+ * später bei Bedarf bereinigt werden können.
+ * @param request Ein Zeiger auf die hinzuzufügende Anfrage.
+ */
+void addRequestToList(Request *request);
+
+/**
+ * @brief Entfernt eine nicht blockierende Anfrage aus der verketteten Liste.
+ * Diese Funktion entfernt eine Anfrage aus der verketteten Liste der Anfragen.
+ * Die Anfrage wird anhand ihres Zeigers gesucht und aus der Liste entfernt.
+ * @param request Ein Zeiger auf die zu entfernende Anfrage.
+ */
+void removeRequestFromList(Request *request);
+
+/**
+ * @brief Bereinigt die verkettete Liste der nicht blockierenden Anfragen.
+ * Diese Funktion durchläuft die gesamte verkettete Liste der Anfragen und entfernt
+ * jede einzelne. Dabei werden alle Ressourcen, die mit jeder Anfrage verbunden sind,
+ * freigegeben, einschließlich Semaphore und Mutexes.
+ * Diese Funktion wird in der Regel beim Programmabschluss aufgerufen, um sicherzustellen,
+ * dass keine Anfragen mehr laufen und alle Ressourcen ordnungsgemäß freigegeben wurden.
+ */
+void cleanupRequestList();
 
 /**
  * @brief Initialisiert die Synchronisationsobjekte wie Bedingungsvariablen, Mutexe und Semaphoren.
@@ -202,171 +251,5 @@ void initialize_process_data(SharedMemory *ptr);
  */
 int cleanup_resources(SharedMemory *ptr, int prozessAnzahl);
 
-int OSMP_Barrier(void);
-int OSMP_BarrierGather(void);
-int OSMP_Gather(void *sendbuf, int sendcount, OSMP_Datatype sendtype, void *recvbuf, int recvcount, OSMP_Datatype recvtype, int root) ;
 
 #endif //BETRIEBSSYSTEME_OSMPLIB_H
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// /******************************************************************************
-//  * FILE: osmpLib.h
-//  * AUTHOR: Darius Malysiak
-//  * DESCRIPTION:
-//  * In dieser Datei sind zusätzliche (eigene) Hilfsfunktionen für die **interne**
-//  * Verwendung der OSMP-Bibliothek definiert.
-//  ******************************************************************************/
-//
-// #ifndef __OSMP_LIB_H__
-// #define __OSMP_LIB_H__
-//
-//
-// #include "OSMP.h"
-//
-// /**
-//  * @brief Dieses Makro wird verwendet, um den Compiler davon zu überzeugen, dass
-//  * eine Variable verwendet wird.
-//  *
-//  * @param x Die zu verwendende Variable
-//  */
-// #define UNUSED(x) (void)(x);
-// #define NOT_SET -1
-//
-//
-//
-// typedef struct ps_pool
-// {
-//     int is_set; // is already set ...
-//     int len; // length how many users are already there ...
-//     int total_size ; // the whole size ...
-//     int free_stack[];
-//     pid_t pool[];
-// } ps_pool;
-//
-//
-//
-// typedef struct header {
-//     int dst;
-//     int src;
-//     int len;
-//     OSMP_Datatype type;
-// }header;
-//
-//
-// typedef struct msg_slots
-// {
-//     int len;
-//     // int is_set;
-//     int dst;
-//     int src;
-//     OSMP_Datatype type;
-//     char message[OSMP_MAX_PAYLOAD_LENGTH];
-// } msg_slots;
-//
-//
-//
-//
-//
-// typedef struct
-// {
-//     int process_number;
-//     OSMP_Verbosity verbosity;
-//     int is_set_flag;
-//     char* log_file;
-// } params;
-//
-//
-// extern ps_pool *pid_pool ;
-// extern msg_slots *slots_pool ;
-//
-// params get_parameter(int argc, char** argv);
-//
-// #endif // __OSMP_LIB_H__

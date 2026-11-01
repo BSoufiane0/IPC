@@ -9,7 +9,7 @@
 #define __OSMP_RUN_H__
 
 #include <stdio.h>
-
+#include "../osmpLibrary/osmpLib.h"
 #include "../osmpLibrary/OSMP.h"
 
 #endif // __OSMP_RUN_H__

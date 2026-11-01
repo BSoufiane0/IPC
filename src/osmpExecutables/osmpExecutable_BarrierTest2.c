@@ -1,10 +1,17 @@
-//
-// Created by kali on 6/1/25.
-//
-#include "../osmpLibrary/osmpLib.h"
+/******************************************************************************
+* FILE: osmpExecutable_BarrierTest2.c
+* DESCRIPTION:
+* Program test of OSMP_BARRIER: CALL BARRIER 10000 TIMES
+* Autor: Soufiane Baeloul, Yahya Foundou
+* Configuration: 10 ./osmpExecutable_BarrierTest2
+******************************************************************************/
 
 
-#define NUM_BARRIERS 10
+#include <stdio.h>
+
+#include "../osmpLibrary/OSMP.h"
+
+#define NUM_BARRIERS 10000
 
 int main(int argc, char *argv[]){
     int rank;
